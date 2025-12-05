@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* スマホでの操作感を良くする設定 */
+body {
+  background-color: #f3f4f6;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
