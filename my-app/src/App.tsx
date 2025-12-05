@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, RotateCcw, Plus, Package, Archive } from 'lucide-react';
+import { Search, RotateCcw, Plus, Package, Archive, Minus } from 'lucide-react';
 
 // ▼▼▼ ここにGASのウェブアプリURLを貼り付けてください ▼▼▼
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxMvTFQ_XiZq9DflJ5TkogOuMa6wbyjNrNMb1ACSWGK77hGshkmu5fr51C91AVlQPhhTA/exec";
@@ -26,27 +26,27 @@ export default function App() {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [qty, setQty] = useState(1);
 
+  // 発注点の初期値を「1」に変更
   const [newItem, setNewItem] = useState({
-    name: '', publisher: '', isbn: '', location: '', stock: 1, alert: 5
+    name: '', publisher: '', isbn: '', location: '', stock: 1, alert: 1
   });
 
+  // --- データ取得 ---
   const fetchItems = async () => {
     setLoading(true);
     try {
       const response = await fetch(`${GAS_API_URL}?action=get`);
       const data = await response.json();
-      
       const formattedData = data.map((item: any) => ({
         ...item,
         商品ID: Number(item.商品ID),
         現在在庫数: Number(item.現在在庫数),
         発注点: Number(item.発注点)
       }));
-      
       setItems(formattedData);
     } catch (error) {
       console.error(error);
-      alert("データの取得に失敗しました");
+      // エラー表示も控えめに
     } finally {
       setLoading(false);
     }
@@ -56,10 +56,12 @@ export default function App() {
     fetchItems();
   }, []);
 
+  // --- 在庫更新（確認なし・完了報告なし） ---
   const handleStockUpdate = async (type: '入庫' | '出庫') => {
     if (!selectedItem) return;
-    if (!window.confirm(`${selectedItem.教科書名} を ${qty}冊 ${type}しますか？`)) return;
-
+    
+    // 確認ダイアログを削除しました
+    
     setLoading(true);
     try {
       const response = await fetch(GAS_API_URL, {
@@ -76,7 +78,7 @@ export default function App() {
       const result = await response.json();
 
       if (result.status === 'success') {
-        alert(`${type}完了！`);
+        // 完了アラートを削除しました
         setQty(1);
         setSelectedItem(null);
         fetchItems();
@@ -84,15 +86,17 @@ export default function App() {
         alert(`エラー: ${result.message}`);
       }
     } catch (error) {
-      alert("通信エラーが発生しました");
+      alert("通信エラー");
     } finally {
       setLoading(false);
     }
   };
 
+  // --- 新規登録（確認なし・完了報告なし） ---
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!window.confirm(`「${newItem.name}」を登録しますか？`)) return;
+    
+    // 確認ダイアログを削除しました
 
     setLoading(true);
     try {
@@ -105,15 +109,15 @@ export default function App() {
       const result = await response.json();
 
       if (result.status === 'success') {
-        alert("登録しました！");
-        setNewItem({ name: '', publisher: '', isbn: '', location: '', stock: 1, alert: 5 });
+        // 完了アラートを削除しました
+        setNewItem({ name: '', publisher: '', isbn: '', location: '', stock: 1, alert: 1 }); // 初期値リセット
         setView('list');
         fetchItems();
       } else {
         alert(`エラー: ${result.message}`);
       }
     } catch (error) {
-      alert("通信エラーが発生しました");
+      alert("通信エラー");
     } finally {
       setLoading(false);
     }
@@ -135,7 +139,7 @@ export default function App() {
     <div className="min-h-screen pb-32">
       <div className="max-w-[600px] mx-auto bg-white min-h-screen shadow-xl relative">
         
-        {/* ヘッダーエリア */}
+        {/* ヘッダー */}
         <div className="sticky top-0 bg-white z-10 border-b border-gray-200 px-4 pt-4 pb-2">
           <h1 className="text-xl font-black text-gray-900 mb-3">教科書在庫管理</h1>
           <div className="flex bg-gray-100 p-1 rounded-lg mb-2">
@@ -154,6 +158,7 @@ export default function App() {
           </div>
         </div>
 
+        {/* ローディング */}
         {loading && (
           <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -163,6 +168,7 @@ export default function App() {
         <div className="p-2">
           {view === 'list' && (
             <>
+              {/* 検索・更新 */}
               <div className="flex gap-2 mb-3 px-2">
                 <div className="relative flex-grow">
                   <Search className="absolute left-2 top-2.5 text-gray-400" size={16} />
@@ -179,17 +185,20 @@ export default function App() {
                 </button>
               </div>
 
+              {/* ソートボタン */}
               <div className="flex gap-2 mb-3 px-2 overflow-x-auto pb-1">
                 <SortButton label="追加順" active={sortMode === 'id'} onClick={() => setSortMode('id')} />
                 <SortButton label="在庫少ない順" active={sortMode === 'stock'} onClick={() => setSortMode('stock')} />
                 <SortButton label="名前順" active={sortMode === 'name'} onClick={() => setSortMode('name')} />
               </div>
 
-              <div className="flex bg-[#222] text-white text-[10px] font-bold py-2 px-3 rounded-t mx-1">
+              {/* リストヘッダー */}
+              <div className="flex bg-[#222] text-white text-[10px] font-bold py-1 px-3 rounded-t mx-1">
                 <div className="w-[80%]">教科書名 (タップして選択)</div>
                 <div className="w-[20%] text-center">在庫</div>
               </div>
 
+              {/* 在庫リスト */}
               <div className="pb-4">
                 {filteredItems.map((item) => {
                   const isSelected = selectedItem?.商品ID === item.商品ID;
@@ -221,11 +230,26 @@ export default function App() {
             </>
           )}
 
+          {/* 新規登録画面 */}
           {view === 'add' && (
             <div className="p-4">
               <form onSubmit={handleAddItem} className="space-y-4">
-                <InputGroup label="教科書名" value={newItem.name} onChange={(e: any) => setNewItem({...newItem, name: e.target.value})} placeholder="例: 高校数学I" required={true} />
-                <InputGroup label="出版社" value={newItem.publisher} onChange={(e: any) => setNewItem({...newItem, publisher: e.target.value})} placeholder="例: 数研出版" required={true} />
+                <InputGroup 
+                  label="教科書名" 
+                  value={newItem.name} 
+                  onChange={(e: any) => setNewItem({...newItem, name: e.target.value})} 
+                  placeholder="例: 高校数学I" 
+                  required={true} 
+                  showAsterisk={true} // 赤い * を追加
+                />
+                <InputGroup 
+                  label="出版社" 
+                  value={newItem.publisher} 
+                  onChange={(e: any) => setNewItem({...newItem, publisher: e.target.value})} 
+                  placeholder="例: 数研出版" 
+                  required={true} 
+                  showAsterisk={true} // 赤い * を追加
+                />
                 <div className="flex gap-3">
                   <InputGroup label="初期在庫" type="number" value={newItem.stock} onChange={(e: any) => setNewItem({...newItem, stock: Number(e.target.value)})} />
                   <InputGroup label="発注点" type="number" value={newItem.alert} onChange={(e: any) => setNewItem({...newItem, alert: Number(e.target.value)})} />
@@ -242,6 +266,7 @@ export default function App() {
           )}
         </div>
 
+        {/* 固定フッター（操作パネル：+-ボタン追加版） */}
         {view === 'list' && (
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_15px_rgba(0,0,0,0.1)] p-3 pb-6 z-40">
             <div className="max-w-[600px] mx-auto">
@@ -250,17 +275,36 @@ export default function App() {
               </div>
 
               <div className="flex gap-3 h-[45px]">
-                <div className="w-[25%] relative">
-                  <div className="absolute left-2 top-0 bottom-0 flex items-center pointer-events-none text-gray-400 font-bold text-xs">数</div>
+                
+                {/* 数量入力エリア（ボタン付き） */}
+                <div className="w-[30%] flex items-center border-2 border-gray-200 rounded-lg overflow-hidden h-full">
+                  {/* マイナスボタン */}
+                  <button 
+                    onClick={() => setQty(Math.max(1, qty - 1))}
+                    className="w-8 h-full bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-gray-100 active:bg-gray-200 border-r"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  
+                  {/* 入力欄 */}
                   <input 
                     type="number" 
                     min="1" 
                     value={qty} 
                     onChange={e => setQty(Math.max(1, Number(e.target.value)))}
-                    className="w-full h-full text-center border-2 border-gray-200 rounded-lg font-bold text-lg focus:border-blue-500 outline-none pl-4 bg-white"
+                    className="flex-1 h-full text-center font-bold text-lg outline-none bg-white px-0"
                   />
+                  
+                  {/* プラスボタン */}
+                  <button 
+                    onClick={() => setQty(qty + 1)}
+                    className="w-8 h-full bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-gray-100 active:bg-gray-200 border-l"
+                  >
+                    <Plus size={14} />
+                  </button>
                 </div>
 
+                {/* 入庫ボタン */}
                 <ActionButton 
                   label="入庫" 
                   icon={<Package size={18} />} 
@@ -269,6 +313,7 @@ export default function App() {
                   onClick={() => handleStockUpdate('入庫')} 
                 />
 
+                {/* 出庫ボタン */}
                 <ActionButton 
                   label="出庫" 
                   icon={<Archive size={18} />} 
@@ -286,7 +331,6 @@ export default function App() {
   );
 }
 
-// エラーを消すために型定義を any にしています
 const SortButton = ({ label, active, onClick }: any) => (
   <button 
     onClick={onClick} 
@@ -296,9 +340,12 @@ const SortButton = ({ label, active, onClick }: any) => (
   </button>
 );
 
-const InputGroup = ({ label, value, onChange, type = "text", placeholder, required }: any) => (
+const InputGroup = ({ label, value, onChange, type = "text", placeholder, required, showAsterisk }: any) => (
   <div className="flex-1">
-    <label className="text-xs font-bold text-gray-500 ml-1">{label}</label>
+    <label className="text-xs font-bold text-gray-500 ml-1">
+      {label}
+      {showAsterisk && <span className="text-red-500 ml-1">*</span>}
+    </label>
     <input 
       type={type} 
       required={required}
