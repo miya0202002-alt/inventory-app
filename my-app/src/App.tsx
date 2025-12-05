@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, RotateCcw, Plus, Package, Archive, Minus } from 'lucide-react';
+// 矢印アイコン（ChevronUp, ChevronDown）を追加しました
+import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown } from 'lucide-react';
 
 // ▼▼▼ ここにGASのウェブアプリURLを貼り付けてください ▼▼▼
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxMvTFQ_XiZq9DflJ5TkogOuMa6wbyjNrNMb1ACSWGK77hGshkmu5fr51C91AVlQPhhTA/exec";
@@ -26,7 +27,6 @@ export default function App() {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [qty, setQty] = useState(1);
 
-  // 発注点の初期値を「1」に変更
   const [newItem, setNewItem] = useState({
     name: '', publisher: '', isbn: '', location: '', stock: 1, alert: 1
   });
@@ -37,16 +37,17 @@ export default function App() {
     try {
       const response = await fetch(`${GAS_API_URL}?action=get`);
       const data = await response.json();
+      
       const formattedData = data.map((item: any) => ({
         ...item,
         商品ID: Number(item.商品ID),
         現在在庫数: Number(item.現在在庫数),
         発注点: Number(item.発注点)
       }));
+      
       setItems(formattedData);
     } catch (error) {
       console.error(error);
-      // エラー表示も控えめに
     } finally {
       setLoading(false);
     }
@@ -56,11 +57,18 @@ export default function App() {
     fetchItems();
   }, []);
 
-  // --- 在庫更新（確認なし・完了報告なし） ---
+  // --- アプリの状態をリセット（タイトルクリック時） ---
+  const resetApp = () => {
+    setView('list');
+    setSearchQuery('');
+    setSelectedItem(null);
+    setSortMode('id');
+    setQty(1);
+  };
+
+  // --- 在庫更新 ---
   const handleStockUpdate = async (type: '入庫' | '出庫') => {
     if (!selectedItem) return;
-    
-    // 確認ダイアログを削除しました
     
     setLoading(true);
     try {
@@ -78,8 +86,7 @@ export default function App() {
       const result = await response.json();
 
       if (result.status === 'success') {
-        // 完了アラートを削除しました
-        setQty(1);
+        setQty(1); // 初期値1に戻す
         setSelectedItem(null);
         fetchItems();
       } else {
@@ -92,12 +99,9 @@ export default function App() {
     }
   };
 
-  // --- 新規登録（確認なし・完了報告なし） ---
+  // --- 新規登録 ---
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 確認ダイアログを削除しました
-
     setLoading(true);
     try {
       const response = await fetch(GAS_API_URL, {
@@ -109,8 +113,7 @@ export default function App() {
       const result = await response.json();
 
       if (result.status === 'success') {
-        // 完了アラートを削除しました
-        setNewItem({ name: '', publisher: '', isbn: '', location: '', stock: 1, alert: 1 }); // 初期値リセット
+        setNewItem({ name: '', publisher: '', isbn: '', location: '', stock: 1, alert: 1 });
         setView('list');
         fetchItems();
       } else {
@@ -123,6 +126,7 @@ export default function App() {
     }
   };
 
+  // --- フィルタリング・ソート ---
   const filteredItems = items
     .filter(item => 
       searchQuery === '' || 
@@ -141,7 +145,14 @@ export default function App() {
         
         {/* ヘッダー */}
         <div className="sticky top-0 bg-white z-10 border-b border-gray-200 px-4 pt-4 pb-2">
-          <h1 className="text-xl font-black text-gray-900 mb-3">教科書在庫管理</h1>
+          {/* タイトル：クリックでリセット、文字サイズアップ */}
+          <h1 
+            onClick={resetApp}
+            className="text-2xl font-black text-gray-900 mb-3 pl-2 cursor-pointer active:opacity-70 transition-opacity select-none"
+          >
+            教科書在庫管理
+          </h1>
+
           <div className="flex bg-gray-100 p-1 rounded-lg mb-2">
             <button 
               onClick={() => setView('list')}
@@ -185,7 +196,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* ソートボタン */}
+              {/* ソートボタン：文字サイズアップ */}
               <div className="flex gap-2 mb-3 px-2 overflow-x-auto pb-1">
                 <SortButton label="追加順" active={sortMode === 'id'} onClick={() => setSortMode('id')} />
                 <SortButton label="在庫少ない順" active={sortMode === 'stock'} onClick={() => setSortMode('stock')} />
@@ -240,7 +251,7 @@ export default function App() {
                   onChange={(e: any) => setNewItem({...newItem, name: e.target.value})} 
                   placeholder="例: 高校数学I" 
                   required={true} 
-                  showAsterisk={true} // 赤い * を追加
+                  showAsterisk={true}
                 />
                 <InputGroup 
                   label="出版社" 
@@ -248,7 +259,7 @@ export default function App() {
                   onChange={(e: any) => setNewItem({...newItem, publisher: e.target.value})} 
                   placeholder="例: 数研出版" 
                   required={true} 
-                  showAsterisk={true} // 赤い * を追加
+                  showAsterisk={true}
                 />
                 <div className="flex gap-3">
                   <InputGroup label="初期在庫" type="number" value={newItem.stock} onChange={(e: any) => setNewItem({...newItem, stock: Number(e.target.value)})} />
@@ -266,7 +277,7 @@ export default function App() {
           )}
         </div>
 
-        {/* 固定フッター（操作パネル：+-ボタン追加版） */}
+        {/* 固定フッター（操作パネル） */}
         {view === 'list' && (
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_15px_rgba(0,0,0,0.1)] p-3 pb-6 z-40">
             <div className="max-w-[600px] mx-auto">
@@ -276,32 +287,33 @@ export default function App() {
 
               <div className="flex gap-3 h-[45px]">
                 
-                {/* 数量入力エリア（ボタン付き） */}
-                <div className="w-[30%] flex items-center border-2 border-gray-200 rounded-lg overflow-hidden h-full">
-                  {/* マイナスボタン */}
-                  <button 
-                    onClick={() => setQty(Math.max(1, qty - 1))}
-                    className="w-8 h-full bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-gray-100 active:bg-gray-200 border-r"
-                  >
-                    <Minus size={14} />
-                  </button>
-                  
-                  {/* 入力欄 */}
+                {/* 数量入力エリア（右寄せスピンボタン仕様） */}
+                <div className="w-[30%] flex border-2 border-gray-200 rounded-lg overflow-hidden h-full bg-white">
+                  {/* 数字入力部 */}
                   <input 
                     type="number" 
                     min="1" 
                     value={qty} 
                     onChange={e => setQty(Math.max(1, Number(e.target.value)))}
-                    className="flex-1 h-full text-center font-bold text-lg outline-none bg-white px-0"
+                    className="flex-1 h-full text-center font-bold text-lg outline-none px-2"
+                    style={{ appearance: 'none', MozAppearance: 'textfield' }} // ブラウザ標準の矢印を消す
                   />
                   
-                  {/* プラスボタン */}
-                  <button 
-                    onClick={() => setQty(qty + 1)}
-                    className="w-8 h-full bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-gray-100 active:bg-gray-200 border-l"
-                  >
-                    <Plus size={14} />
-                  </button>
+                  {/* 右側の上下矢印ボタン */}
+                  <div className="flex flex-col w-8 border-l border-gray-200">
+                    <button 
+                      onClick={() => setQty(qty + 1)}
+                      className="flex-1 flex items-center justify-center bg-gray-50 hover:bg-gray-100 active:bg-gray-200 border-b border-gray-200 transition-colors"
+                    >
+                      <ChevronUp size={14} className="text-gray-600" />
+                    </button>
+                    <button 
+                      onClick={() => setQty(Math.max(1, qty - 1))}
+                      className="flex-1 flex items-center justify-center bg-gray-50 hover:bg-gray-100 active:bg-gray-200 transition-colors"
+                    >
+                      <ChevronDown size={14} className="text-gray-600" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* 入庫ボタン */}
@@ -331,10 +343,11 @@ export default function App() {
   );
 }
 
+// ソートボタン（文字サイズ少し大きく：text-xs）
 const SortButton = ({ label, active, onClick }: any) => (
   <button 
     onClick={onClick} 
-    className={`px-3 py-1 rounded-full border text-[10px] font-bold whitespace-nowrap transition-colors ${active ? 'bg-black text-white border-black' : 'bg-white text-gray-500 border-gray-200'}`}
+    className={`px-3 py-1 rounded-full border text-xs font-bold whitespace-nowrap transition-colors ${active ? 'bg-black text-white border-black' : 'bg-white text-gray-500 border-gray-200'}`}
   >
     {label}
   </button>
