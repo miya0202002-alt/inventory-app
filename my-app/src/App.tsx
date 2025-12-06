@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown } from 'lucide-react';
 
 // ▼▼▼ ここにGASのウェブアプリURLを貼り付けてください ▼▼▼
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbx60hISKDT6FfUp-hMNPt7mKp1DTRRJpyAKmMtgNhXawUdbkDg2eStaCLrcdf6CK8sRgQ/exec";
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbygo7SoLmr_0cEZ55giqRE3Y3l4t3o6-oD6u6-xoPKI12zpf3quHfIXk5_rL8oPiEfiEg/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 // データ型定義
@@ -23,7 +23,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // 並べ替えモード（ID, 在庫, 名前, 教科, 学年）
+  // 並べ替えモード
   const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('id');
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -33,7 +33,7 @@ export default function App() {
   const [newItem, setNewItem] = useState({
     name: '', 
     subject: '数学', 
-    subjectManual: '', // 手入力用
+    subjectManual: '', 
     grade: '', 
     stock: 1, 
     alert: 1, 
@@ -114,7 +114,6 @@ export default function App() {
     e.preventDefault();
     setLoading(true);
     
-    // 教科の決定（その他なら手入力値を使う）
     const finalSubject = newItem.subject === 'その他' ? newItem.subjectManual : newItem.subject;
 
     try {
@@ -135,7 +134,6 @@ export default function App() {
       const result = await response.json();
 
       if (result.status === 'success') {
-        // リセット
         setNewItem({ name: '', subject: '数学', subjectManual: '', grade: '', stock: 1, alert: 1, cost: 0 });
         setView('list');
         fetchItems();
@@ -165,7 +163,8 @@ export default function App() {
     });
 
   return (
-    <div className="min-h-screen pb-32">
+    // ★ここに font-bold を追加しました！
+    <div className="min-h-screen pb-32 font-bold">
       <div className="max-w-[600px] mx-auto bg-white min-h-screen shadow-xl relative">
         
         {/* ヘッダー */}
