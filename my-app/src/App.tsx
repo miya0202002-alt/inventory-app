@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-// 矢印アイコン（ChevronUp, ChevronDown）を追加しました
 import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown } from 'lucide-react';
 
 // ▼▼▼ ここにGASのウェブアプリURLを貼り付けてください ▼▼▼
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxMvTFQ_XiZq9DflJ5TkogOuMa6wbyjNrNMb1ACSWGK77hGshkmu5fr51C91AVlQPhhTA/exec";
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbx60hISKDT6FfUp-hMNPt7mKp1DTRRJpyAKmMtgNhXawUdbkDg2eStaCLrcdf6CK8sRgQ/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 // データ型定義
 interface Item {
   商品ID: number;
-  教科書名: string;
-  ISBNコード: string;
-  出版社: string;
+  教材名: string;
+  教科: string;
+  学年: string;
   現在在庫数: number;
   発注点: number;
-  保管場所: string;
+  教材原価: number;
+  在庫金額: number;
 }
 
 export default function App() {
@@ -22,13 +22,22 @@ export default function App() {
   const [view, setView] = useState<'list' | 'add'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name'>('id');
+  
+  // 並べ替えモード（ID, 在庫, 名前, 教科, 学年）
+  const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('id');
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [qty, setQty] = useState(1);
 
+  // 新規登録用ステート
   const [newItem, setNewItem] = useState({
-    name: '', publisher: '', isbn: '', location: '', stock: 1, alert: 1
+    name: '', 
+    subject: '数学', 
+    subjectManual: '', // 手入力用
+    grade: '', 
+    stock: 1, 
+    alert: 1, 
+    cost: 0
   });
 
   // --- データ取得 ---
@@ -42,7 +51,9 @@ export default function App() {
         ...item,
         商品ID: Number(item.商品ID),
         現在在庫数: Number(item.現在在庫数),
-        発注点: Number(item.発注点)
+        発注点: Number(item.発注点),
+        教材原価: Number(item.教材原価),
+        在庫金額: Number(item.在庫金額)
       }));
       
       setItems(formattedData);
@@ -57,7 +68,6 @@ export default function App() {
     fetchItems();
   }, []);
 
-  // --- アプリの状態をリセット（タイトルクリック時） ---
   const resetApp = () => {
     setView('list');
     setSearchQuery('');
@@ -86,7 +96,7 @@ export default function App() {
       const result = await response.json();
 
       if (result.status === 'success') {
-        setQty(1); // 初期値1に戻す
+        setQty(1);
         setSelectedItem(null);
         fetchItems();
       } else {
@@ -103,17 +113,30 @@ export default function App() {
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    
+    // 教科の決定（その他なら手入力値を使う）
+    const finalSubject = newItem.subject === 'その他' ? newItem.subjectManual : newItem.subject;
+
     try {
       const response = await fetch(GAS_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'add', ...newItem })
+        body: JSON.stringify({ 
+          action: 'add', 
+          name: newItem.name,
+          subject: finalSubject,
+          grade: newItem.grade,
+          stock: newItem.stock,
+          alert: newItem.alert,
+          cost: newItem.cost
+        })
       });
 
       const result = await response.json();
 
       if (result.status === 'success') {
-        setNewItem({ name: '', publisher: '', isbn: '', location: '', stock: 1, alert: 1 });
+        // リセット
+        setNewItem({ name: '', subject: '数学', subjectManual: '', grade: '', stock: 1, alert: 1, cost: 0 });
         setView('list');
         fetchItems();
       } else {
@@ -130,12 +153,14 @@ export default function App() {
   const filteredItems = items
     .filter(item => 
       searchQuery === '' || 
-      String(item.教科書名).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(item.出版社).toLowerCase().includes(searchQuery.toLowerCase())
+      String(item.教材名).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(item.教科).toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
       if (sortMode === 'stock') return a.現在在庫数 - b.現在在庫数;
-      if (sortMode === 'name') return a.教科書名.localeCompare(b.教科書名);
+      if (sortMode === 'name') return a.教材名.localeCompare(b.教材名);
+      if (sortMode === 'subject') return a.教科.localeCompare(b.教科);
+      if (sortMode === 'grade') return a.学年.localeCompare(b.学年);
       return b.商品ID - a.商品ID;
     });
 
@@ -145,11 +170,7 @@ export default function App() {
         
         {/* ヘッダー */}
         <div className="sticky top-0 bg-white z-10 border-b border-gray-200 px-4 pt-4 pb-2">
-          {/* タイトル：クリックでリセット、文字サイズアップ */}
-          <h1 
-            onClick={resetApp}
-            className="text-2xl font-black text-gray-900 mb-3 pl-2 cursor-pointer active:opacity-70 transition-opacity select-none"
-          >
+          <h1 onClick={resetApp} className="text-2xl font-black text-gray-900 mb-3 pl-2 cursor-pointer active:opacity-70 transition-opacity select-none">
             教科書在庫管理
           </h1>
 
@@ -196,17 +217,19 @@ export default function App() {
                 </button>
               </div>
 
-              {/* ソートボタン：文字サイズアップ */}
+              {/* ソートボタン */}
               <div className="flex gap-2 mb-3 px-2 overflow-x-auto pb-1">
                 <SortButton label="追加順" active={sortMode === 'id'} onClick={() => setSortMode('id')} />
+                <SortButton label="教科順" active={sortMode === 'subject'} onClick={() => setSortMode('subject')} />
+                <SortButton label="学年順" active={sortMode === 'grade'} onClick={() => setSortMode('grade')} />
                 <SortButton label="在庫少ない順" active={sortMode === 'stock'} onClick={() => setSortMode('stock')} />
                 <SortButton label="名前順" active={sortMode === 'name'} onClick={() => setSortMode('name')} />
               </div>
 
               {/* リストヘッダー */}
               <div className="flex bg-[#222] text-white text-[10px] font-bold py-1 px-3 rounded-t mx-1">
-                <div className="w-[80%]">教科書名 (タップして選択)</div>
-                <div className="w-[20%] text-center">在庫</div>
+                <div className="w-[75%]">教材名 (タップして選択)</div>
+                <div className="w-[25%] text-center">在庫</div>
               </div>
 
               {/* 在庫リスト */}
@@ -224,11 +247,17 @@ export default function App() {
                         ${isSelected ? 'bg-green-50 border-l-4 border-l-green-500 pl-2' : 'bg-white hover:bg-gray-50 border-l-4 border-l-transparent'}
                       `}
                     >
-                      <div className="w-[80%] pr-2">
-                        <div className="font-bold text-[14px] leading-snug text-gray-800">{item.教科書名}</div>
-                        <div className="text-[10px] text-gray-500 mt-1">{item.出版社}</div>
+                      <div className="w-[75%] pr-2">
+                        <div className="font-bold text-[14px] leading-snug text-gray-800">
+                          {item.教材名}
+                          <span className="text-[11px] font-normal text-gray-500 ml-2">¥{item.教材原価.toLocaleString()}</span>
+                        </div>
+                        <div className="text-[10px] text-gray-500 mt-1 flex gap-2">
+                          <span className="bg-gray-100 px-1 rounded">{item.教科}</span>
+                          <span className="bg-gray-100 px-1 rounded">{item.学年}</span>
+                        </div>
                       </div>
-                      <div className="w-[20%] text-center flex flex-col items-center justify-center">
+                      <div className="w-[25%] text-center flex flex-col items-center justify-center">
                         <span className={`text-[16px] font-bold ${isLow ? 'text-red-500' : 'text-gray-800'}`}>
                           {item.現在在庫数}
                         </span>
@@ -246,29 +275,55 @@ export default function App() {
             <div className="p-4">
               <form onSubmit={handleAddItem} className="space-y-4">
                 <InputGroup 
-                  label="教科書名" 
+                  label="教材名" 
                   value={newItem.name} 
                   onChange={(e: any) => setNewItem({...newItem, name: e.target.value})} 
                   placeholder="例: 高校数学I" 
                   required={true} 
                   showAsterisk={true}
                 />
+                
+                {/* 教科選択 */}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 ml-1">教科 <span className="text-red-500">*</span></label>
+                  <select 
+                    className="w-full border p-3 rounded-lg mt-1 bg-white"
+                    value={newItem.subject}
+                    onChange={e => setNewItem({...newItem, subject: e.target.value})}
+                  >
+                    <option value="数学">数学</option>
+                    <option value="英語">英語</option>
+                    <option value="論理">論理</option>
+                    <option value="その他">その他 (手入力)</option>
+                  </select>
+                  {newItem.subject === 'その他' && (
+                    <input 
+                      type="text" 
+                      className="w-full border p-3 rounded-lg mt-2 bg-gray-50"
+                      placeholder="教科名を入力"
+                      value={newItem.subjectManual}
+                      onChange={e => setNewItem({...newItem, subjectManual: e.target.value})}
+                      required
+                    />
+                  )}
+                </div>
+
                 <InputGroup 
-                  label="出版社" 
-                  value={newItem.publisher} 
-                  onChange={(e: any) => setNewItem({...newItem, publisher: e.target.value})} 
-                  placeholder="例: 数研出版" 
-                  required={true} 
-                  showAsterisk={true}
+                  label="学年" 
+                  value={newItem.grade} 
+                  onChange={(e: any) => setNewItem({...newItem, grade: e.target.value})} 
+                  placeholder="例: 高1" 
                 />
+
+                <div className="flex gap-3">
+                  <InputGroup label="教材原価" type="number" value={newItem.cost} onChange={(e: any) => setNewItem({...newItem, cost: Number(e.target.value)})} required showAsterisk />
+                </div>
+
                 <div className="flex gap-3">
                   <InputGroup label="初期在庫" type="number" value={newItem.stock} onChange={(e: any) => setNewItem({...newItem, stock: Number(e.target.value)})} />
                   <InputGroup label="発注点" type="number" value={newItem.alert} onChange={(e: any) => setNewItem({...newItem, alert: Number(e.target.value)})} />
                 </div>
-                <div className="flex gap-3">
-                  <InputGroup label="ISBN" value={newItem.isbn} onChange={(e: any) => setNewItem({...newItem, isbn: e.target.value})} />
-                  <InputGroup label="保管場所" value={newItem.location} onChange={(e: any) => setNewItem({...newItem, location: e.target.value})} />
-                </div>
+
                 <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg mt-6 shadow-lg active:scale-95 transition-transform">
                   登録する
                 </button>
@@ -277,29 +332,24 @@ export default function App() {
           )}
         </div>
 
-        {/* 固定フッター（操作パネル） */}
+        {/* 固定フッター */}
         {view === 'list' && (
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_15px_rgba(0,0,0,0.1)] p-3 pb-6 z-40">
             <div className="max-w-[600px] mx-auto">
               <div className="text-xs text-gray-500 mb-2 truncate px-1">
-                選択中: <b className="text-black text-sm ml-1">{selectedItem ? selectedItem.教科書名 : "（リストから選択してください）"}</b>
+                選択中: <b className="text-black text-sm ml-1">{selectedItem ? selectedItem.教材名 : "（リストから選択してください）"}</b>
               </div>
 
               <div className="flex gap-3 h-[45px]">
-                
-                {/* 数量入力エリア（右寄せスピンボタン仕様） */}
                 <div className="w-[30%] flex border-2 border-gray-200 rounded-lg overflow-hidden h-full bg-white">
-                  {/* 数字入力部 */}
                   <input 
                     type="number" 
                     min="1" 
                     value={qty} 
                     onChange={e => setQty(Math.max(1, Number(e.target.value)))}
                     className="flex-1 h-full text-center font-bold text-lg outline-none px-2"
-                    style={{ appearance: 'none', MozAppearance: 'textfield' }} // ブラウザ標準の矢印を消す
+                    style={{ appearance: 'none', MozAppearance: 'textfield' }}
                   />
-                  
-                  {/* 右側の上下矢印ボタン */}
                   <div className="flex flex-col w-8 border-l border-gray-200">
                     <button 
                       onClick={() => setQty(qty + 1)}
@@ -316,7 +366,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 入庫ボタン */}
                 <ActionButton 
                   label="入庫" 
                   icon={<Package size={18} />} 
@@ -325,7 +374,6 @@ export default function App() {
                   onClick={() => handleStockUpdate('入庫')} 
                 />
 
-                {/* 出庫ボタン */}
                 <ActionButton 
                   label="出庫" 
                   icon={<Archive size={18} />} 
@@ -343,7 +391,6 @@ export default function App() {
   );
 }
 
-// ソートボタン（文字サイズ少し大きく：text-xs）
 const SortButton = ({ label, active, onClick }: any) => (
   <button 
     onClick={onClick} 
