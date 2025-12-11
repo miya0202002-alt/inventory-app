@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 
 // ▼▼▼ ここにGASのウェブアプリURLを貼り付けてください ▼▼▼
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbygo7SoLmr_0cEZ55giqRE3Y3l4t3o6-oD6u6-xoPKI12zpf3quHfIXk5_rL8oPiEfiEg/exec";
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxOeRd-cw4EdwNPeryhUBAUmGdWcHOlgtqly1kpsXRiK4tDVk0WUnEIKhrikDIre9Gpfw/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 // データ型定義
@@ -17,7 +17,7 @@ interface Item {
   在庫金額: number;
 }
 
-// 入力用ステートの型（空文字を許容するため string | number）
+// 入力用ステートの型
 interface NewItemState {
   name: string;
   subject: string;
@@ -34,11 +34,10 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // ソートモード
   const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('id');
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  
-  // 数量入力を空文字許容にする
   const [qty, setQty] = useState<number | ''>(1);
 
   const [newItem, setNewItem] = useState<NewItemState>({
@@ -158,7 +157,6 @@ export default function App() {
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // バリデーション
     if (newItem.cost === '') {
         alert("教材原価を入力してください");
         return;
@@ -188,6 +186,10 @@ export default function App() {
       if (result.status === 'success') {
         setNewItem({ name: '', subject: '数学', subjectManual: '', grade: '', stock: 1, alert: 1, cost: 0 });
         setView('list');
+        
+        // ★ここを追加：自動で「学年順」にする
+        setSortMode('grade');
+        
         fetchItems();
       } else {
         alert(`エラー: ${result.message}`);
