@@ -5,7 +5,7 @@ import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Tras
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-// 学年の並び順定義（これを使って並び替えます）
+// 学年の並び順定義（入力の選択肢用）
 const GRADE_ORDER = [
   "小1", "小2", "小3", "小4", "小5", "小6",
   "中1", "中2", "中3",
@@ -21,14 +21,16 @@ interface Item {
   発注点: number;
   教材原価: number;
   在庫金額: number;
+  // ★追加：スプレッドシートの並び順を記憶するための番号
+  originalIndex: number;
 }
 
 interface NewItemState {
   name: string;
   subject: string;
   subjectManual: string;
-  grade: string;        // プルダウン選択用
-  gradeManual: string;  // 手入力用
+  grade: string;        
+  gradeManual: string;  
   stock: number | '';
   alert: number | '';
   cost: number | '';
@@ -40,7 +42,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('id');
+  // 初期値は 'grade' ですが、これは実質「スプシ順」を意味することになります
+  const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('grade');
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [qty, setQty] = useState<number | ''>(1);
@@ -49,8 +52,8 @@ export default function App() {
     name: '', 
     subject: '数学', 
     subjectManual: '', 
-    grade: '中1',     // 初期値
-    gradeManual: '',  // 手入力初期値
+    grade: '中1',     
+    gradeManual: '',  
     stock: 1, 
     alert: 1, 
     cost: 0
@@ -62,13 +65,15 @@ export default function App() {
       const response = await fetch(`${GAS_API_URL}?action=get`);
       const data = await response.json();
       
-      const formattedData = data.map((item: any) => ({
+      // ★ここで「スプシの並び順 (index)」をデータに付与します
+      const formattedData = data.map((item: any, index: number) => ({
         ...item,
         商品ID: Number(item.商品ID),
         現在在庫数: Number(item.現在在庫数),
         発注点: Number(item.発注点),
         教材原価: Number(item.教材原価),
-        在庫金額: Number(item.在庫金額)
+        在庫金額: Number(item.在庫金額),
+        originalIndex: index // 0, 1, 2... と順番を振る
       }));
       
       setItems(formattedData);
@@ -87,7 +92,7 @@ export default function App() {
     setView('list');
     setSearchQuery('');
     setSelectedItem(null);
-    setSortMode('id');
+    setSortMode('grade');
     setQty(1);
   };
 
@@ -167,10 +172,7 @@ export default function App() {
 
     setLoading(true);
     
-    // 教科の決定
     const finalSubject = newItem.subject === 'その他' ? newItem.subjectManual : newItem.subject;
-    
-    // ★学年の決定（その他なら手入力値、それ以外ならプルダウン値）
     const finalGrade = newItem.grade === 'その他' ? newItem.gradeManual : newItem.grade;
 
     try {
@@ -181,7 +183,7 @@ export default function App() {
           action: 'add', 
           name: newItem.name,
           subject: finalSubject,
-          grade: finalGrade, // 決定した学年を送る
+          grade: finalGrade, 
           stock: newItem.stock === '' ? 0 : newItem.stock,
           alert: newItem.alert === '' ? 0 : newItem.alert,
           cost: newItem.cost
@@ -193,11 +195,11 @@ export default function App() {
       if (result.status === 'success') {
         setNewItem({ 
           name: '', subject: '数学', subjectManual: '', 
-          grade: '中1', gradeManual: '', // リセット
+          grade: '中1', gradeManual: '', 
           stock: 1, alert: 1, cost: 0 
         });
         setView('list');
-        setSortMode('grade');
+        setSortMode('grade'); 
         fetchItems();
       } else {
         alert(`エラー: ${result.message}`);
@@ -207,13 +209,6 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // ★学年順のランクを取得する関数（小さいほど上に来る）
-  const getGradeRank = (gradeStr: string) => {
-    const index = GRADE_ORDER.indexOf(gradeStr);
-    // リストにないもの（その他手入力など）は 999 にして一番下にする
-    return index === -1 ? 999 : index;
   };
 
   const filteredItems = items
@@ -227,13 +222,9 @@ export default function App() {
       if (sortMode === 'name') return a.教材名.localeCompare(b.教材名, 'ja');
       if (sortMode === 'subject') return a.教科.localeCompare(b.教科, 'ja');
       
-      // ★学年順ソートロジック
+      // ★修正：学年順のときは、スプレッドシートの順番(originalIndex)通りにする
       if (sortMode === 'grade') {
-        const rankA = getGradeRank(a.学年);
-        const rankB = getGradeRank(b.学年);
-        if (rankA !== rankB) return rankA - rankB;
-        // 学年が同じなら名前順にする
-        return a.教材名.localeCompare(b.教材名, 'ja');
+        return a.originalIndex - b.originalIndex;
       }
 
       return b.商品ID - a.商品ID;
@@ -294,11 +285,11 @@ export default function App() {
 
               {/* ソートボタン */}
               <div className="flex gap-2 mb-3 px-2 overflow-x-auto pb-1">
-                <SortButton label="追加順" active={sortMode === 'id'} onClick={() => setSortMode('id')} />
-                <SortButton label="教科順" active={sortMode === 'subject'} onClick={() => setSortMode('subject')} />
                 <SortButton label="学年順" active={sortMode === 'grade'} onClick={() => setSortMode('grade')} />
-                <SortButton label="在庫少ない順" active={sortMode === 'stock'} onClick={() => setSortMode('stock')} />
+                <SortButton label="教科順" active={sortMode === 'subject'} onClick={() => setSortMode('subject')} />
                 <SortButton label="名前順" active={sortMode === 'name'} onClick={() => setSortMode('name')} />
+                <SortButton label="追加順" active={sortMode === 'id'} onClick={() => setSortMode('id')} />
+                <SortButton label="在庫少ない順" active={sortMode === 'stock'} onClick={() => setSortMode('stock')} />
               </div>
 
               {/* リストヘッダー */}
@@ -383,7 +374,7 @@ export default function App() {
                   )}
                 </div>
 
-                {/* ★学年選択（プルダウン化） */}
+                {/* 学年選択 */}
                 <div>
                   <label className="text-xs font-bold text-gray-500 ml-1">学年 <span className="text-red-500">*</span></label>
                   <select 
