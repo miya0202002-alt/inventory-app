@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 
 // ▼▼▼ ここにGASのウェブアプリURLを貼り付けてください ▼▼▼
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxOeRd-cw4EdwNPeryhUBAUmGdWcHOlgtqly1kpsXRiK4tDVk0WUnEIKhrikDIre9Gpfw/exec";
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-// データ型定義
 interface Item {
   商品ID: number;
   教材名: string;
@@ -17,7 +16,6 @@ interface Item {
   在庫金額: number;
 }
 
-// 入力用ステートの型
 interface NewItemState {
   name: string;
   subject: string;
@@ -34,7 +32,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // ソートモード
   const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('id');
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -85,7 +82,6 @@ export default function App() {
     setQty(1);
   };
 
-  // --- 在庫更新 ---
   const handleStockUpdate = async (type: '入庫' | '出庫') => {
     if (!selectedItem) return;
     if (qty === '' || qty <= 0) {
@@ -122,7 +118,6 @@ export default function App() {
     }
   };
 
-  // --- 削除機能 ---
   const handleDelete = async () => {
     if (!selectedItem) return;
     if (!window.confirm(`本当に「${selectedItem.教材名}」を削除しますか？\nこの操作は取り消せません。`)) return;
@@ -134,7 +129,8 @@ export default function App() {
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({
           action: 'delete',
-          id: selectedItem.商品ID
+          // ★修正: IDを明示的に文字列として送信し、型不一致を防ぐ
+          id: String(selectedItem.商品ID)
         })
       });
 
@@ -147,13 +143,12 @@ export default function App() {
         alert(`エラー: ${result.message}`);
       }
     } catch (error) {
-      alert("通信エラー");
+      alert("通信エラー: サーバーからの応答が無効です");
     } finally {
       setLoading(false);
     }
   };
 
-  // --- 新規登録 ---
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -186,10 +181,7 @@ export default function App() {
       if (result.status === 'success') {
         setNewItem({ name: '', subject: '数学', subjectManual: '', grade: '', stock: 1, alert: 1, cost: 0 });
         setView('list');
-        
-        // ★ここを追加：自動で「学年順」にする
         setSortMode('grade');
-        
         fetchItems();
       } else {
         alert(`エラー: ${result.message}`);
