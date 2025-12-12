@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 
 // ▼▼▼ ここにGASのウェブアプリURLを貼り付けてください ▼▼▼
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec";
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec;
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 interface Item {
@@ -32,6 +32,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // 初期ソートはID順、登録後はgrade(学年)順などに切り替えます
   const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('id');
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -129,7 +130,6 @@ export default function App() {
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({
           action: 'delete',
-          // ★修正: IDを明示的に文字列として送信し、型不一致を防ぐ
           id: String(selectedItem.商品ID)
         })
       });
@@ -181,7 +181,10 @@ export default function App() {
       if (result.status === 'success') {
         setNewItem({ name: '', subject: '数学', subjectManual: '', grade: '', stock: 1, alert: 1, cost: 0 });
         setView('list');
+        
+        // ★新規登録後は「学年順」に並べ替える
         setSortMode('grade');
+        
         fetchItems();
       } else {
         alert(`エラー: ${result.message}`);
@@ -200,10 +203,11 @@ export default function App() {
       String(item.教科).toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
+      // localeCompareに'ja'を指定して、日本語として正しく並ぶようにする
       if (sortMode === 'stock') return a.現在在庫数 - b.現在在庫数;
-      if (sortMode === 'name') return a.教材名.localeCompare(b.教材名);
-      if (sortMode === 'subject') return a.教科.localeCompare(b.教科);
-      if (sortMode === 'grade') return a.学年.localeCompare(b.学年);
+      if (sortMode === 'name') return a.教材名.localeCompare(b.教材名, 'ja');
+      if (sortMode === 'subject') return a.教科.localeCompare(b.教科, 'ja');
+      if (sortMode === 'grade') return a.学年.localeCompare(b.学年, 'ja');
       return b.商品ID - a.商品ID;
     });
 
