@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 
-// ▼▼▼ ここにGASのウェブアプリURLを貼り付けてください ▼▼▼
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec;
+// ▼▼▼ 新しいURLに書き換えました ▼▼▼
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 interface Item {
@@ -182,7 +182,7 @@ export default function App() {
         setNewItem({ name: '', subject: '数学', subjectManual: '', grade: '', stock: 1, alert: 1, cost: 0 });
         setView('list');
         
-        // ★新規登録後は「学年順」に並べ替える
+        // 新規登録後は「学年順」に並べ替える
         setSortMode('grade');
         
         fetchItems();
@@ -203,7 +203,7 @@ export default function App() {
       String(item.教科).toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      // localeCompareに'ja'を指定して、日本語として正しく並ぶようにする
+      // localeCompareに'ja'を指定
       if (sortMode === 'stock') return a.現在在庫数 - b.現在在庫数;
       if (sortMode === 'name') return a.教材名.localeCompare(b.教材名, 'ja');
       if (sortMode === 'subject') return a.教科.localeCompare(b.教科, 'ja');
