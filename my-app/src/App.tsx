@@ -5,7 +5,7 @@ import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Tras
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-// 学年の並び順定義（入力の選択肢用）
+// 学年の並び順定義
 const GRADE_ORDER = [
   "小1", "小2", "小3", "小4", "小5", "小6",
   "中1", "中2", "中3",
@@ -21,7 +21,6 @@ interface Item {
   発注点: number;
   教材原価: number;
   在庫金額: number;
-  // ★追加：スプレッドシートの並び順を記憶するための番号
   originalIndex: number;
 }
 
@@ -42,7 +41,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // 初期値は 'grade' ですが、これは実質「スプシ順」を意味することになります
   const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('grade');
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -56,7 +54,7 @@ export default function App() {
     gradeManual: '',  
     stock: 1, 
     alert: 1, 
-    cost: 0
+    cost: '' // ★変更: 初期値を0から空欄に変更
   });
 
   const fetchItems = async () => {
@@ -65,7 +63,6 @@ export default function App() {
       const response = await fetch(`${GAS_API_URL}?action=get`);
       const data = await response.json();
       
-      // ★ここで「スプシの並び順 (index)」をデータに付与します
       const formattedData = data.map((item: any, index: number) => ({
         ...item,
         商品ID: Number(item.商品ID),
@@ -73,7 +70,7 @@ export default function App() {
         発注点: Number(item.発注点),
         教材原価: Number(item.教材原価),
         在庫金額: Number(item.在庫金額),
-        originalIndex: index // 0, 1, 2... と順番を振る
+        originalIndex: index
       }));
       
       setItems(formattedData);
@@ -165,6 +162,7 @@ export default function App() {
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // 原価は計算に必須なので空欄チェックは残しますが、初期値は空です
     if (newItem.cost === '') {
         alert("教材原価を入力してください");
         return;
@@ -196,7 +194,7 @@ export default function App() {
         setNewItem({ 
           name: '', subject: '数学', subjectManual: '', 
           grade: '中1', gradeManual: '', 
-          stock: 1, alert: 1, cost: 0 
+          stock: 1, alert: 1, cost: '' // リセット時も空欄に
         });
         setView('list');
         setSortMode('grade'); 
@@ -222,7 +220,6 @@ export default function App() {
       if (sortMode === 'name') return a.教材名.localeCompare(b.教材名, 'ja');
       if (sortMode === 'subject') return a.教科.localeCompare(b.教科, 'ja');
       
-      // ★修正：学年順のときは、スプレッドシートの順番(originalIndex)通りにする
       if (sortMode === 'grade') {
         return a.originalIndex - b.originalIndex;
       }
@@ -376,7 +373,8 @@ export default function App() {
 
                 {/* 学年選択 */}
                 <div>
-                  <label className="text-xs font-bold text-gray-500 ml-1">学年 <span className="text-red-500">*</span></label>
+                  {/* ★変更: 必須の赤色アスタリスクを削除 */}
+                  <label className="text-xs font-bold text-gray-500 ml-1">学年</label>
                   <select 
                     className="w-full border p-3 rounded-lg mt-1 bg-white"
                     value={newItem.grade}
@@ -385,15 +383,20 @@ export default function App() {
                     {GRADE_ORDER.map(g => (
                       <option key={g} value={g}>{g}</option>
                     ))}
-                    <option value="その他">その他 (手入力)</option>
+                    {/* ★変更: 文言を「その他」のみに */}
+                    <option value="その他">その他</option>
                   </select>
                   {newItem.grade === 'その他' && (
                     <input 
                       type="text" 
                       className="w-full border p-3 rounded-lg mt-2 bg-gray-50"
-                      placeholder="学名を入力 (例: 既卒)"
+                      // ★変更: プレースホルダーを変更
+                      placeholder="学名を入力"
                       value={newItem.gradeManual}
                       onChange={e => setNewItem({...newItem, gradeManual: e.target.value})}
+                      // 手入力も必須ではなくす場合は required を外すことも可能ですが、
+                      // 「その他」を選んで空欄だと困ると思うので、一旦必須のままにしています。
+                      // もし必須解除したい場合は required を削除してください。
                       required
                     />
                   )}
@@ -456,6 +459,7 @@ export default function App() {
               <div className="flex gap-2 h-[45px]">
                 {/* 数量入力 */}
                 <div className={`w-[25%] flex border-2 rounded-lg overflow-hidden h-full bg-white relative ${qty === '' ? 'border-red-500' : 'border-gray-200'}`}>
+                  {/* ★変更: ブラウザ標準の矢印を消すクラスを追加 */}
                   <input 
                     type="number" 
                     min="1" 
@@ -464,7 +468,7 @@ export default function App() {
                         const val = e.target.value;
                         setQty(val === '' ? '' : Math.max(1, Number(val)));
                     }}
-                    className="flex-1 h-full text-center font-bold text-lg outline-none px-1 w-full"
+                    className="flex-1 h-full text-center font-bold text-lg outline-none px-1 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     style={{ appearance: 'none', MozAppearance: 'textfield' }}
                   />
                    {/* 空欄時の警告 */}
