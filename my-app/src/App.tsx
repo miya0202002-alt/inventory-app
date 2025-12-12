@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 
-// ▼▼▼ 新しいURLに書き換えました ▼▼▼
+// ▼▼▼ あなたの最新URLです ▼▼▼
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+// 学年の並び順定義（これを使って並び替えます）
+const GRADE_ORDER = [
+  "小1", "小2", "小3", "小4", "小5", "小6",
+  "中1", "中2", "中3",
+  "高1", "高2", "高3"
+];
 
 interface Item {
   商品ID: number;
@@ -20,7 +27,8 @@ interface NewItemState {
   name: string;
   subject: string;
   subjectManual: string;
-  grade: string;
+  grade: string;        // プルダウン選択用
+  gradeManual: string;  // 手入力用
   stock: number | '';
   alert: number | '';
   cost: number | '';
@@ -32,7 +40,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // 初期ソートはID順、登録後はgrade(学年)順などに切り替えます
   const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('id');
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -42,7 +49,8 @@ export default function App() {
     name: '', 
     subject: '数学', 
     subjectManual: '', 
-    grade: '', 
+    grade: '中1',     // 初期値
+    gradeManual: '',  // 手入力初期値
     stock: 1, 
     alert: 1, 
     cost: 0
@@ -143,7 +151,7 @@ export default function App() {
         alert(`エラー: ${result.message}`);
       }
     } catch (error) {
-      alert("通信エラー: サーバーからの応答が無効です");
+      alert("通信エラー");
     } finally {
       setLoading(false);
     }
@@ -159,7 +167,11 @@ export default function App() {
 
     setLoading(true);
     
+    // 教科の決定
     const finalSubject = newItem.subject === 'その他' ? newItem.subjectManual : newItem.subject;
+    
+    // ★学年の決定（その他なら手入力値、それ以外ならプルダウン値）
+    const finalGrade = newItem.grade === 'その他' ? newItem.gradeManual : newItem.grade;
 
     try {
       const response = await fetch(GAS_API_URL, {
@@ -169,7 +181,7 @@ export default function App() {
           action: 'add', 
           name: newItem.name,
           subject: finalSubject,
-          grade: newItem.grade,
+          grade: finalGrade, // 決定した学年を送る
           stock: newItem.stock === '' ? 0 : newItem.stock,
           alert: newItem.alert === '' ? 0 : newItem.alert,
           cost: newItem.cost
@@ -179,12 +191,13 @@ export default function App() {
       const result = await response.json();
 
       if (result.status === 'success') {
-        setNewItem({ name: '', subject: '数学', subjectManual: '', grade: '', stock: 1, alert: 1, cost: 0 });
+        setNewItem({ 
+          name: '', subject: '数学', subjectManual: '', 
+          grade: '中1', gradeManual: '', // リセット
+          stock: 1, alert: 1, cost: 0 
+        });
         setView('list');
-        
-        // 新規登録後は「学年順」に並べ替える
         setSortMode('grade');
-        
         fetchItems();
       } else {
         alert(`エラー: ${result.message}`);
@@ -196,6 +209,13 @@ export default function App() {
     }
   };
 
+  // ★学年順のランクを取得する関数（小さいほど上に来る）
+  const getGradeRank = (gradeStr: string) => {
+    const index = GRADE_ORDER.indexOf(gradeStr);
+    // リストにないもの（その他手入力など）は 999 にして一番下にする
+    return index === -1 ? 999 : index;
+  };
+
   const filteredItems = items
     .filter(item => 
       searchQuery === '' || 
@@ -203,11 +223,19 @@ export default function App() {
       String(item.教科).toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      // localeCompareに'ja'を指定
       if (sortMode === 'stock') return a.現在在庫数 - b.現在在庫数;
       if (sortMode === 'name') return a.教材名.localeCompare(b.教材名, 'ja');
       if (sortMode === 'subject') return a.教科.localeCompare(b.教科, 'ja');
-      if (sortMode === 'grade') return a.学年.localeCompare(b.学年, 'ja');
+      
+      // ★学年順ソートロジック
+      if (sortMode === 'grade') {
+        const rankA = getGradeRank(a.学年);
+        const rankB = getGradeRank(b.学年);
+        if (rankA !== rankB) return rankA - rankB;
+        // 学年が同じなら名前順にする
+        return a.教材名.localeCompare(b.教材名, 'ja');
+      }
+
       return b.商品ID - a.商品ID;
     });
 
@@ -355,12 +383,30 @@ export default function App() {
                   )}
                 </div>
 
-                <InputGroup 
-                  label="学年" 
-                  value={newItem.grade} 
-                  onChange={(e: any) => setNewItem({...newItem, grade: e.target.value})} 
-                  placeholder="例: 高1" 
-                />
+                {/* ★学年選択（プルダウン化） */}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 ml-1">学年 <span className="text-red-500">*</span></label>
+                  <select 
+                    className="w-full border p-3 rounded-lg mt-1 bg-white"
+                    value={newItem.grade}
+                    onChange={e => setNewItem({...newItem, grade: e.target.value})}
+                  >
+                    {GRADE_ORDER.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                    <option value="その他">その他 (手入力)</option>
+                  </select>
+                  {newItem.grade === 'その他' && (
+                    <input 
+                      type="text" 
+                      className="w-full border p-3 rounded-lg mt-2 bg-gray-50"
+                      placeholder="学名を入力 (例: 既卒)"
+                      value={newItem.gradeManual}
+                      onChange={e => setNewItem({...newItem, gradeManual: e.target.value})}
+                      required
+                    />
+                  )}
+                </div>
 
                 <div className="flex gap-3">
                   <InputGroup 
