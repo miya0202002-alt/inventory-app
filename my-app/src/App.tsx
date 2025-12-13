@@ -347,7 +347,6 @@ export default function App() {
                 <div className="flex gap-2 overflow-x-auto pb-1 flex-1">
                     <SortButton label="学年順" active={sortMode === 'grade'} onClick={() => setSortMode('grade')} />
                     <SortButton label="教科順" active={sortMode === 'subject'} onClick={() => setSortMode('subject')} />
-                    <SortButton label="名前順" active={sortMode === 'name'} onClick={() => setSortMode('name')} />
                     <SortButton label="追加順" active={sortMode === 'id'} onClick={() => setSortMode('id')} />
                     <SortButton label="在庫少ない順" active={sortMode === 'stock'} onClick={() => setSortMode('stock')} />
                 </div>
