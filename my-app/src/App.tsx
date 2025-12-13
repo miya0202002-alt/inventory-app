@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2, Pencil, CheckSquare, Square, ExternalLink } from 'lucide-react';
+import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2, Pencil, CheckSquare, Square } from 'lucide-react';
 
 // ▼▼▼ あなたの最新URLです ▼▼▼
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec";
@@ -36,21 +36,16 @@ interface NewItemState {
 
 export default function App() {
   const [items, setItems] = useState<Item[]>([]);
-  
-  // view に 'edit' を追加
   const [view, setView] = useState<'list' | 'add' | 'edit'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // ★追加: 在庫ありのみ表示のフィルター (初期値: true)
   const [showStockOnly, setShowStockOnly] = useState(true);
-
   const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('grade');
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [qty, setQty] = useState<number | ''>(1);
 
-  // フォーム用ステート
   const [newItem, setNewItem] = useState<NewItemState>({
     name: '', 
     subject: '数学', 
@@ -98,11 +93,9 @@ export default function App() {
     setQty(1);
   };
 
-  // 編集モードへの切り替え
   const handleEditClick = () => {
     if (!selectedItem) return;
     
-    // 既存データを選択肢に合わせるロジック
     const isStandardSubject = ["数学", "算数", "英語", "論理"].includes(selectedItem.教科);
     const isStandardGrade = GRADE_ORDER.includes(selectedItem.学年);
 
@@ -112,7 +105,7 @@ export default function App() {
         subjectManual: isStandardSubject ? '' : selectedItem.教科,
         grade: isStandardGrade ? selectedItem.学年 : (selectedItem.学年 ? 'その他' : '中1'),
         gradeManual: isStandardGrade ? '' : selectedItem.学年,
-        stock: selectedItem.現在在庫数, // 編集モードでは在庫数は表示のみ(変更不可)の想定だが、フォームに入れる
+        stock: selectedItem.現在在庫数, 
         alert: selectedItem.発注点,
         cost: selectedItem.教材原価
     });
@@ -198,8 +191,6 @@ export default function App() {
     
     const finalSubject = newItem.subject === 'その他' ? newItem.subjectManual : newItem.subject;
     const finalGrade = newItem.grade === 'その他' ? newItem.gradeManual : newItem.grade;
-
-    // 編集モードかどうかでアクションを変える
     const actionType = view === 'edit' ? 'edit_data' : 'add';
     const idParam = view === 'edit' && selectedItem ? { id: selectedItem.商品ID } : {};
 
@@ -242,14 +233,10 @@ export default function App() {
 
   const filteredItems = items
     .filter(item => {
-      // 検索フィルター
       const matchesSearch = searchQuery === '' || 
         String(item.教材名).toLowerCase().includes(searchQuery.toLowerCase()) ||
         String(item.教科).toLowerCase().includes(searchQuery.toLowerCase());
-      
-      // ★在庫ありフィルター (trueなら在庫1以上のみ表示)
       const matchesStock = showStockOnly ? item.現在在庫数 > 0 : true;
-
       return matchesSearch && matchesStock;
     })
     .sort((a, b) => {
@@ -273,15 +260,26 @@ export default function App() {
               教科書在庫管理
             </h1>
             
-            {/* ★追加: 外部リンクボタン */}
-            <div className="flex gap-2">
-              <a href="https://www.chuoh-kyouiku.co.jp/index.php" target="_blank" rel="noopener noreferrer" 
-                 className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-[10px] transition-colors">
-                <ExternalLink size={10} /> 中央教育研究所
+            {/* ★画像リンクエリア (高さ統一・比率保持) */}
+            <div className="flex gap-3 items-center">
+              {/* 中央教育研究所 */}
+              <a 
+                href="https://www.chuoh-kyouiku.co.jp/index.php" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="hover:opacity-70 transition-opacity h-9 flex items-center"
+              >
+                <img src="/chuoh.png" alt="中央教育研究所" className="h-full w-auto object-contain" />
               </a>
-              <a href="https://www.ikushin.co.jp/" target="_blank" rel="noopener noreferrer" 
-                 className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-[10px] transition-colors">
-                <ExternalLink size={10} /> 育伸社
+
+              {/* 育伸社 */}
+              <a 
+                href="https://www.ikushin.co.jp/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="hover:opacity-70 transition-opacity h-9 flex items-center"
+              >
+                <img src="/ikushin.png" alt="育伸社" className="h-full w-auto object-contain" />
               </a>
             </div>
           </div>
@@ -338,7 +336,6 @@ export default function App() {
 
               {/* ソート & フィルター */}
               <div className="flex flex-wrap gap-2 mb-3 px-2 items-center">
-                {/* ★追加: 在庫ありのみフィルター */}
                 <button 
                   onClick={() => setShowStockOnly(!showStockOnly)}
                   className="flex items-center gap-1 text-xs font-bold text-gray-700 mr-2 active:opacity-70"
@@ -362,7 +359,6 @@ export default function App() {
                 <div className="w-[25%] text-center">在庫</div>
               </div>
 
-              {/* 在庫リスト */}
               <div className="pb-4">
                 {filteredItems.map((item) => {
                   const isSelected = selectedItem?.商品ID === item.商品ID;
@@ -400,7 +396,6 @@ export default function App() {
             </>
           )}
 
-          {/* 新規登録 または 編集画面 */}
           {(view === 'add' || view === 'edit') && (
             <div className="p-4">
                <h2 className="text-xl font-bold mb-4 text-center">
@@ -417,7 +412,6 @@ export default function App() {
                   showAsterisk={true}
                 />
                 
-                {/* 教科選択 */}
                 <div>
                   <label className="text-xs font-bold text-gray-500 ml-1">教科 <span className="text-red-500">*</span></label>
                   <select 
@@ -426,7 +420,6 @@ export default function App() {
                     onChange={e => setNewItem({...newItem, subject: e.target.value})}
                   >
                     <option value="数学">数学</option>
-                    {/* ★追加: 算数を追加 */}
                     <option value="算数">算数</option>
                     <option value="英語">英語</option>
                     <option value="論理">論理</option>
@@ -444,7 +437,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* 学年選択 */}
                 <div>
                   <label className="text-xs font-bold text-gray-500 ml-1">学年</label>
                   <select 
@@ -464,7 +456,6 @@ export default function App() {
                       placeholder="学名を入力"
                       value={newItem.gradeManual}
                       onChange={e => setNewItem({...newItem, gradeManual: e.target.value})}
-                      /* ★修正: 必須属性を削除 (手入力時も空欄許可) */
                     />
                   )}
                 </div>
@@ -485,17 +476,12 @@ export default function App() {
                 </div>
 
                 <div className="flex gap-3">
-                  {/* 編集モードの場合、在庫数はここで変えても意味がないため(入出庫機能を使うべき)、disabledにするか、初期値修正として扱うか。
-                      今回は「基本情報の編集」なので、在庫数は表示するけど編集不可にするのが安全ですが、
-                      ご要望の「追加画面と同じような感じ」に合わせ、入力可能にしておきます（ただしGAS側で在庫数は更新しない仕様にしています）
-                   */}
                   <div className="flex-1">
                      <InputGroup 
                         label={view === 'edit' ? "現在在庫(変更不可)" : "初期在庫"} 
                         type="number" 
                         value={newItem.stock} 
                         onChange={(e: any) => {
-                             // 編集モードなら変更させない
                              if(view === 'edit') return;
                              const val = e.target.value;
                              setNewItem({...newItem, stock: val === '' ? '' : Number(val)});
@@ -546,7 +532,6 @@ export default function App() {
               </div>
 
               <div className="flex gap-2 h-[45px]">
-                {/* 数量入力 */}
                 <div className={`w-[25%] flex border-2 rounded-lg overflow-hidden h-full bg-white relative ${qty === '' ? 'border-red-500' : 'border-gray-200'}`}>
                   <input 
                     type="number" 
@@ -581,7 +566,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* ボタン群 */}
                 <ActionButton 
                   label="入庫" 
                   icon={<Package size={16} />} 
@@ -598,7 +582,6 @@ export default function App() {
                   onClick={() => handleStockUpdate('出庫')} 
                 />
 
-                {/* ★変更: 削除ボタンを半分にして編集ボタンを追加 */}
                 <div className="flex flex-1 gap-1 min-w-0">
                     <ActionButton 
                         label="編集" 
