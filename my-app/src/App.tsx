@@ -340,8 +340,8 @@ export default function App() {
                   onClick={() => setShowStockOnly(!showStockOnly)}
                   className="flex items-center gap-1 text-xs font-bold text-gray-700 mr-2 active:opacity-70"
                 >
-                  {showStockOnly ? <CheckSquare size={16} /> : <Square size={16} />}
-                  在庫のある物のみ表示
+                 {showStockOnly ? <CheckSquare size={16} /> : <Square size={16} />}
+                  在庫がある商品のみ表示
                 </button>
 
                 <div className="flex gap-2 overflow-x-auto pb-1 flex-1">
@@ -452,7 +452,7 @@ export default function App() {
                     <input 
                       type="text" 
                       className="w-full border p-3 rounded-lg mt-2 bg-gray-50"
-                      placeholder="学名を入力"
+                      placeholder="学年を入力"
                       value={newItem.gradeManual}
                       onChange={e => setNewItem({...newItem, gradeManual: e.target.value})}
                     />
