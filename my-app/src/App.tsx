@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
+import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2, Pencil, CheckSquare, Square, ExternalLink } from 'lucide-react';
 
 // ▼▼▼ あなたの最新URLです ▼▼▼
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-// 学年の並び順定義
 const GRADE_ORDER = [
   "小1", "小2", "小3", "小4", "小5", "小6",
   "中1", "中2", "中3",
@@ -37,15 +36,21 @@ interface NewItemState {
 
 export default function App() {
   const [items, setItems] = useState<Item[]>([]);
-  const [view, setView] = useState<'list' | 'add'>('list');
+  
+  // view に 'edit' を追加
+  const [view, setView] = useState<'list' | 'add' | 'edit'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // ★追加: 在庫ありのみ表示のフィルター (初期値: true)
+  const [showStockOnly, setShowStockOnly] = useState(true);
+
   const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('grade');
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [qty, setQty] = useState<number | ''>(1);
 
+  // フォーム用ステート
   const [newItem, setNewItem] = useState<NewItemState>({
     name: '', 
     subject: '数学', 
@@ -54,7 +59,7 @@ export default function App() {
     gradeManual: '',  
     stock: 1, 
     alert: 1, 
-    cost: '' // ★変更: 初期値を0から空欄に変更
+    cost: ''
   });
 
   const fetchItems = async () => {
@@ -91,6 +96,28 @@ export default function App() {
     setSelectedItem(null);
     setSortMode('grade');
     setQty(1);
+  };
+
+  // 編集モードへの切り替え
+  const handleEditClick = () => {
+    if (!selectedItem) return;
+    
+    // 既存データを選択肢に合わせるロジック
+    const isStandardSubject = ["数学", "算数", "英語", "論理"].includes(selectedItem.教科);
+    const isStandardGrade = GRADE_ORDER.includes(selectedItem.学年);
+
+    setNewItem({
+        name: selectedItem.教材名,
+        subject: isStandardSubject ? selectedItem.教科 : 'その他',
+        subjectManual: isStandardSubject ? '' : selectedItem.教科,
+        grade: isStandardGrade ? selectedItem.学年 : (selectedItem.学年 ? 'その他' : '中1'),
+        gradeManual: isStandardGrade ? '' : selectedItem.学年,
+        stock: selectedItem.現在在庫数, // 編集モードでは在庫数は表示のみ(変更不可)の想定だが、フォームに入れる
+        alert: selectedItem.発注点,
+        cost: selectedItem.教材原価
+    });
+    
+    setView('edit');
   };
 
   const handleStockUpdate = async (type: '入庫' | '出庫') => {
@@ -159,10 +186,9 @@ export default function App() {
     }
   };
 
-  const handleAddItem = async (e: React.FormEvent) => {
+  const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 原価は計算に必須なので空欄チェックは残しますが、初期値は空です
     if (newItem.cost === '') {
         alert("教材原価を入力してください");
         return;
@@ -173,12 +199,17 @@ export default function App() {
     const finalSubject = newItem.subject === 'その他' ? newItem.subjectManual : newItem.subject;
     const finalGrade = newItem.grade === 'その他' ? newItem.gradeManual : newItem.grade;
 
+    // 編集モードかどうかでアクションを変える
+    const actionType = view === 'edit' ? 'edit_data' : 'add';
+    const idParam = view === 'edit' && selectedItem ? { id: selectedItem.商品ID } : {};
+
     try {
       const response = await fetch(GAS_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ 
-          action: 'add', 
+          action: actionType,
+          ...idParam,
           name: newItem.name,
           subject: finalSubject,
           grade: finalGrade, 
@@ -194,7 +225,7 @@ export default function App() {
         setNewItem({ 
           name: '', subject: '数学', subjectManual: '', 
           grade: '中1', gradeManual: '', 
-          stock: 1, alert: 1, cost: '' // リセット時も空欄に
+          stock: 1, alert: 1, cost: '' 
         });
         setView('list');
         setSortMode('grade'); 
@@ -210,20 +241,22 @@ export default function App() {
   };
 
   const filteredItems = items
-    .filter(item => 
-      searchQuery === '' || 
-      String(item.教材名).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(item.教科).toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    .filter(item => {
+      // 検索フィルター
+      const matchesSearch = searchQuery === '' || 
+        String(item.教材名).toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(item.教科).toLowerCase().includes(searchQuery.toLowerCase());
+      
+      // ★在庫ありフィルター (trueなら在庫1以上のみ表示)
+      const matchesStock = showStockOnly ? item.現在在庫数 > 0 : true;
+
+      return matchesSearch && matchesStock;
+    })
     .sort((a, b) => {
       if (sortMode === 'stock') return a.現在在庫数 - b.現在在庫数;
       if (sortMode === 'name') return a.教材名.localeCompare(b.教材名, 'ja');
       if (sortMode === 'subject') return a.教科.localeCompare(b.教科, 'ja');
-      
-      if (sortMode === 'grade') {
-        return a.originalIndex - b.originalIndex;
-      }
-
+      if (sortMode === 'grade') return a.originalIndex - b.originalIndex;
       return b.商品ID - a.商品ID;
     });
 
@@ -233,9 +266,25 @@ export default function App() {
         
         {/* ヘッダー */}
         <div className="sticky top-0 bg-white z-10 border-b border-gray-200 px-4 pt-4 pb-2">
-          <h1 onClick={resetApp} className="text-2xl font-black text-gray-900 mb-3 pl-2 cursor-pointer active:opacity-70 transition-opacity select-none">
-            教科書在庫管理
-          </h1>
+          
+          {/* タイトルとリンクボタン */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+            <h1 onClick={resetApp} className="text-2xl font-black text-gray-900 cursor-pointer active:opacity-70 transition-opacity select-none whitespace-nowrap">
+              教科書在庫管理
+            </h1>
+            
+            {/* ★追加: 外部リンクボタン */}
+            <div className="flex gap-2">
+              <a href="https://www.chuoh-kyouiku.co.jp/index.php" target="_blank" rel="noopener noreferrer" 
+                 className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-[10px] transition-colors">
+                <ExternalLink size={10} /> 中央教育研究所
+              </a>
+              <a href="https://www.ikushin.co.jp/" target="_blank" rel="noopener noreferrer" 
+                 className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-[10px] transition-colors">
+                <ExternalLink size={10} /> 育伸社
+              </a>
+            </div>
+          </div>
 
           <div className="flex bg-gray-100 p-1 rounded-lg mb-2">
             <button 
@@ -245,8 +294,15 @@ export default function App() {
               在庫リスト
             </button>
             <button 
-              onClick={() => setView('add')}
-              className={`flex-1 py-2 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1 ${view === 'add' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+              onClick={() => {
+                  setNewItem({ 
+                    name: '', subject: '数学', subjectManual: '', 
+                    grade: '中1', gradeManual: '', 
+                    stock: 1, alert: 1, cost: '' 
+                  });
+                  setView('add');
+              }}
+              className={`flex-1 py-2 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1 ${(view === 'add' || view === 'edit') ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
             >
               <Plus size={14} /> 教科書を追加
             </button>
@@ -280,13 +336,24 @@ export default function App() {
                 </button>
               </div>
 
-              {/* ソートボタン */}
-              <div className="flex gap-2 mb-3 px-2 overflow-x-auto pb-1">
-                <SortButton label="学年順" active={sortMode === 'grade'} onClick={() => setSortMode('grade')} />
-                <SortButton label="教科順" active={sortMode === 'subject'} onClick={() => setSortMode('subject')} />
-                <SortButton label="名前順" active={sortMode === 'name'} onClick={() => setSortMode('name')} />
-                <SortButton label="追加順" active={sortMode === 'id'} onClick={() => setSortMode('id')} />
-                <SortButton label="在庫少ない順" active={sortMode === 'stock'} onClick={() => setSortMode('stock')} />
+              {/* ソート & フィルター */}
+              <div className="flex flex-wrap gap-2 mb-3 px-2 items-center">
+                {/* ★追加: 在庫ありのみフィルター */}
+                <button 
+                  onClick={() => setShowStockOnly(!showStockOnly)}
+                  className="flex items-center gap-1 text-xs font-bold text-gray-700 mr-2 active:opacity-70"
+                >
+                  {showStockOnly ? <CheckSquare size={16} /> : <Square size={16} />}
+                  在庫のある物のみ表示
+                </button>
+
+                <div className="flex gap-2 overflow-x-auto pb-1 flex-1">
+                    <SortButton label="学年順" active={sortMode === 'grade'} onClick={() => setSortMode('grade')} />
+                    <SortButton label="教科順" active={sortMode === 'subject'} onClick={() => setSortMode('subject')} />
+                    <SortButton label="名前順" active={sortMode === 'name'} onClick={() => setSortMode('name')} />
+                    <SortButton label="追加順" active={sortMode === 'id'} onClick={() => setSortMode('id')} />
+                    <SortButton label="在庫少ない順" active={sortMode === 'stock'} onClick={() => setSortMode('stock')} />
+                </div>
               </div>
 
               {/* リストヘッダー */}
@@ -333,10 +400,14 @@ export default function App() {
             </>
           )}
 
-          {/* 新規登録画面 */}
-          {view === 'add' && (
+          {/* 新規登録 または 編集画面 */}
+          {(view === 'add' || view === 'edit') && (
             <div className="p-4">
-              <form onSubmit={handleAddItem} className="space-y-4">
+               <h2 className="text-xl font-bold mb-4 text-center">
+                 {view === 'edit' ? '教材情報を編集' : '新しい教材を登録'}
+               </h2>
+
+              <form onSubmit={handleSaveItem} className="space-y-4">
                 <InputGroup 
                   label="教材名" 
                   value={newItem.name} 
@@ -355,6 +426,8 @@ export default function App() {
                     onChange={e => setNewItem({...newItem, subject: e.target.value})}
                   >
                     <option value="数学">数学</option>
+                    {/* ★追加: 算数を追加 */}
+                    <option value="算数">算数</option>
                     <option value="英語">英語</option>
                     <option value="論理">論理</option>
                     <option value="その他">その他 (手入力)</option>
@@ -373,7 +446,6 @@ export default function App() {
 
                 {/* 学年選択 */}
                 <div>
-                  {/* ★変更: 必須の赤色アスタリスクを削除 */}
                   <label className="text-xs font-bold text-gray-500 ml-1">学年</label>
                   <select 
                     className="w-full border p-3 rounded-lg mt-1 bg-white"
@@ -383,21 +455,16 @@ export default function App() {
                     {GRADE_ORDER.map(g => (
                       <option key={g} value={g}>{g}</option>
                     ))}
-                    {/* ★変更: 文言を「その他」のみに */}
                     <option value="その他">その他</option>
                   </select>
                   {newItem.grade === 'その他' && (
                     <input 
                       type="text" 
                       className="w-full border p-3 rounded-lg mt-2 bg-gray-50"
-                      // ★変更: プレースホルダーを変更
                       placeholder="学名を入力"
                       value={newItem.gradeManual}
                       onChange={e => setNewItem({...newItem, gradeManual: e.target.value})}
-                      // 手入力も必須ではなくす場合は required を外すことも可能ですが、
-                      // 「その他」を選んで空欄だと困ると思うので、一旦必須のままにしています。
-                      // もし必須解除したい場合は required を削除してください。
-                      required
+                      /* ★修正: 必須属性を削除 (手入力時も空欄許可) */
                     />
                   )}
                 </div>
@@ -418,31 +485,53 @@ export default function App() {
                 </div>
 
                 <div className="flex gap-3">
-                  <InputGroup 
-                    label="初期在庫" 
-                    type="number" 
-                    value={newItem.stock} 
-                    onChange={(e: any) => {
-                        const val = e.target.value;
-                        setNewItem({...newItem, stock: val === '' ? '' : Number(val)});
-                    }}
-                    isError={newItem.stock === ''} 
-                  />
-                  <InputGroup 
-                    label="発注点" 
-                    type="number" 
-                    value={newItem.alert} 
-                    onChange={(e: any) => {
-                        const val = e.target.value;
-                        setNewItem({...newItem, alert: val === '' ? '' : Number(val)});
-                    }} 
-                    isError={newItem.alert === ''}
-                  />
+                  {/* 編集モードの場合、在庫数はここで変えても意味がないため(入出庫機能を使うべき)、disabledにするか、初期値修正として扱うか。
+                      今回は「基本情報の編集」なので、在庫数は表示するけど編集不可にするのが安全ですが、
+                      ご要望の「追加画面と同じような感じ」に合わせ、入力可能にしておきます（ただしGAS側で在庫数は更新しない仕様にしています）
+                   */}
+                  <div className="flex-1">
+                     <InputGroup 
+                        label={view === 'edit' ? "現在在庫(変更不可)" : "初期在庫"} 
+                        type="number" 
+                        value={newItem.stock} 
+                        onChange={(e: any) => {
+                             // 編集モードなら変更させない
+                             if(view === 'edit') return;
+                             const val = e.target.value;
+                             setNewItem({...newItem, stock: val === '' ? '' : Number(val)});
+                        }}
+                        isError={view !== 'edit' && newItem.stock === ''} 
+                      />
+                  </div>
+                  
+                  <div className="flex-1">
+                    <InputGroup 
+                        label="発注点" 
+                        type="number" 
+                        value={newItem.alert} 
+                        onChange={(e: any) => {
+                            const val = e.target.value;
+                            setNewItem({...newItem, alert: val === '' ? '' : Number(val)});
+                        }} 
+                        isError={newItem.alert === ''}
+                    />
+                  </div>
                 </div>
+                
+                {view === 'edit' && (
+                    <p className="text-[10px] text-red-500 text-center">
+                        ※在庫数は「入庫」「出庫」ボタンから変更してください。
+                    </p>
+                )}
 
-                <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg mt-6 shadow-lg active:scale-95 transition-transform">
-                  登録する
-                </button>
+                <div className="flex gap-2">
+                    <button type="button" onClick={resetApp} className="flex-1 bg-gray-200 text-gray-800 font-bold py-3 rounded-lg mt-6 shadow-sm">
+                        キャンセル
+                    </button>
+                    <button type="submit" className="flex-[2] bg-blue-600 text-white font-bold py-3 rounded-lg mt-6 shadow-lg active:scale-95 transition-transform">
+                        {view === 'edit' ? '情報を更新する' : '登録する'}
+                    </button>
+                </div>
               </form>
             </div>
           )}
@@ -459,7 +548,6 @@ export default function App() {
               <div className="flex gap-2 h-[45px]">
                 {/* 数量入力 */}
                 <div className={`w-[25%] flex border-2 rounded-lg overflow-hidden h-full bg-white relative ${qty === '' ? 'border-red-500' : 'border-gray-200'}`}>
-                  {/* ★変更: ブラウザ標準の矢印を消すクラスを追加 */}
                   <input 
                     type="number" 
                     min="1" 
@@ -471,7 +559,6 @@ export default function App() {
                     className="flex-1 h-full text-center font-bold text-lg outline-none px-1 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     style={{ appearance: 'none', MozAppearance: 'textfield' }}
                   />
-                   {/* 空欄時の警告 */}
                    {qty === '' && (
                       <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none flex items-center justify-center">
                           <span className="text-[8px] text-red-500 font-bold bg-white/90 px-1">※数を入力</span>
@@ -511,13 +598,24 @@ export default function App() {
                   onClick={() => handleStockUpdate('出庫')} 
                 />
 
-                <ActionButton 
-                  label="削除" 
-                  icon={<Trash2 size={16} />} 
-                  colorClass="text-gray-500 border-gray-400 hover:bg-gray-100 bg-gray-50" 
-                  disabled={!selectedItem} 
-                  onClick={handleDelete} 
-                />
+                {/* ★変更: 削除ボタンを半分にして編集ボタンを追加 */}
+                <div className="flex flex-1 gap-1 min-w-0">
+                    <ActionButton 
+                        label="編集" 
+                        icon={<Pencil size={14} />} 
+                        colorClass="text-orange-600 border-orange-400 hover:bg-orange-50" 
+                        disabled={!selectedItem} 
+                        onClick={handleEditClick} 
+                    />
+                    <ActionButton 
+                        label="削除" 
+                        icon={<Trash2 size={14} />} 
+                        colorClass="text-gray-500 border-gray-400 hover:bg-gray-100 bg-gray-50" 
+                        disabled={!selectedItem} 
+                        onClick={handleDelete} 
+                    />
+                </div>
+
               </div>
             </div>
           </div>
