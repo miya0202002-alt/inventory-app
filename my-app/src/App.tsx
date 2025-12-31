@@ -576,7 +576,7 @@ export default function App() {
                 <ActionButton 
                   label="出庫" 
                   icon={<Archive size={16} />} 
-                  colorClass="text-blue-600 border-blue-600 hover:bg-blue-50" 
+                  colorClass="text-orange-600 border-orange-400 hover:bg-orange-50" 
                   disabled={!selectedItem || qty === ''} 
                   onClick={() => handleStockUpdate('出庫')} 
                 />
@@ -585,7 +585,7 @@ export default function App() {
                     <ActionButton 
                         label="編集" 
                         icon={<Pencil size={14} />} 
-                        colorClass="text-orange-600 border-orange-400 hover:bg-orange-50" 
+                        colorClass="text-blue-600 border-blue-600 hover:bg-blue-50" 
                         disabled={!selectedItem} 
                         onClick={handleEditClick} 
                     />
