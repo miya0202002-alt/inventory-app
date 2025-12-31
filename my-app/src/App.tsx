@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2, Pencil, CheckSquare, Square } from 'lucide-react';
 
-// ▼▼▼ あなたの最新URLです (変更なし) ▼▼▼
+// ▼▼▼ 顧客の新しいURL（そのままにしてあります） ▼▼▼
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwunczXt8moZUE52_5g4O0NvnCmM-GJTDs2_iQVNPeB9OERKF01G6VfS_lODKUe6V_z-w/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
@@ -20,7 +20,7 @@ interface Item {
   発注点: number;
   教材原価: number;
   在庫金額: number;
-  備考: string; // ★追加
+  備考: string; 
   originalIndex: number;
 }
 
@@ -33,7 +33,7 @@ interface NewItemState {
   stock: number | '';
   alert: number | '';
   cost: number | '';
-  memo: string; // ★追加
+  memo: string; 
 }
 
 // ソートのパターンを定義
@@ -46,7 +46,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   
   const [showStockOnly, setShowStockOnly] = useState(true);
-  const [sortMode, setSortMode] = useState<SortMode>('grade'); // 初期値は学年順
+  const [sortMode, setSortMode] = useState<SortMode>('grade'); 
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [qty, setQty] = useState<number | ''>(1);
@@ -60,7 +60,7 @@ export default function App() {
     stock: 1, 
     alert: 1, 
     cost: '',
-    memo: '' // ★追加
+    memo: '' 
   });
 
   const fetchItems = async () => {
@@ -76,7 +76,8 @@ export default function App() {
         発注点: Number(item.発注点),
         教材原価: Number(item.教材原価),
         在庫金額: Number(item.在庫金額),
-        備考: item.備考 || '', // ★追加（なければ空文字）
+        // ★修正点1: GASからデータが来る際、undefinedを防ぐ
+        備考: item.備考 || '', 
         originalIndex: index
       }));
       
@@ -96,7 +97,6 @@ export default function App() {
     setView('list');
     setSearchQuery('');
     setSelectedItem(null);
-    // ソートモードはリセットせず維持する方が使いやすいのでそのまま
     setQty(1);
   };
 
@@ -115,7 +115,8 @@ export default function App() {
         stock: selectedItem.現在在庫数, 
         alert: selectedItem.発注点,
         cost: selectedItem.教材原価,
-        memo: selectedItem.備考 // ★追加
+        // ★修正点2: 編集画面を開く際、既存の備考を確実にセットする
+        memo: selectedItem.備考 || '' 
     });
     
     setView('edit');
@@ -203,20 +204,24 @@ export default function App() {
     const idParam = view === 'edit' && selectedItem ? { id: selectedItem.商品ID } : {};
 
     try {
+      // ★修正点3: 送信データを作成する際、必ず memo フィールドを含める
+      // undefined の場合は空文字 "" を送ることで、GAS側でのエラーや意図しない挙動を防ぐ
+      const payload = { 
+        action: actionType,
+        ...idParam,
+        name: newItem.name,
+        subject: finalSubject,
+        grade: finalGrade, 
+        stock: newItem.stock === '' ? 0 : newItem.stock,
+        alert: newItem.alert === '' ? 0 : newItem.alert,
+        cost: newItem.cost,
+        memo: newItem.memo || "" 
+      };
+
       const response = await fetch(GAS_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ 
-          action: actionType,
-          ...idParam,
-          name: newItem.name,
-          subject: finalSubject,
-          grade: finalGrade, 
-          stock: newItem.stock === '' ? 0 : newItem.stock,
-          alert: newItem.alert === '' ? 0 : newItem.alert,
-          cost: newItem.cost,
-          memo: newItem.memo // ★追加：備考を送信
-        })
+        body: JSON.stringify(payload)
       });
 
       const result = await response.json();
@@ -228,7 +233,6 @@ export default function App() {
           stock: 1, alert: 1, cost: '', memo: '' 
         });
         setView('list');
-        // 保存後は学年順に戻すか、そのままにするか。ここではそのままにします。
         fetchItems();
       } else {
         alert(`エラー: ${result.message}`);
@@ -242,7 +246,6 @@ export default function App() {
 
   const filteredItems = items
     .filter(item => {
-      // ★検索対象に「備考」も追加
       const searchTarget = (
         String(item.教材名) + 
         String(item.教科) + 
@@ -254,13 +257,12 @@ export default function App() {
       return matchesSearch && matchesStock;
     })
     .sort((a, b) => {
-      // ★ソートロジックの変更
-      if (sortMode === 'grade') return a.originalIndex - b.originalIndex; // 学年順（シートの並び）
-      if (sortMode === 'stockDesc') return b.現在在庫数 - a.現在在庫数; // 在庫多い順
-      if (sortMode === 'stockAsc') return a.現在在庫数 - b.現在在庫数; // 在庫少ない順
-      if (sortMode === 'subject') return a.教科.localeCompare(b.教科, 'ja'); // 教科順
-      if (sortMode === 'name') return a.教材名.localeCompare(b.教材名, 'ja'); // 名前順
-      if (sortMode === 'id') return b.商品ID - a.商品ID; // 追加順（新しいID順）
+      if (sortMode === 'grade') return a.originalIndex - b.originalIndex; 
+      if (sortMode === 'stockDesc') return b.現在在庫数 - a.現在在庫数; 
+      if (sortMode === 'stockAsc') return a.現在在庫数 - b.現在在庫数; 
+      if (sortMode === 'subject') return a.教科.localeCompare(b.教科, 'ja'); 
+      if (sortMode === 'name') return a.教材名.localeCompare(b.教材名, 'ja'); 
+      if (sortMode === 'id') return b.商品ID - a.商品ID; 
       return 0;
     });
 
@@ -276,7 +278,6 @@ export default function App() {
               教科書在庫管理
             </h1>
             
-            {/* 画像リンクエリア */}
             <div className="flex gap-3 items-center">
               <a 
                 href="https://www.chuoh-kyouiku.co.jp/index.php" 
@@ -348,7 +349,7 @@ export default function App() {
                 </button>
               </div>
 
-              {/* ソート & フィルター (プルダウンに変更) */}
+              {/* ソート & フィルター */}
               <div className="flex flex-wrap items-center mb-3 px-2">
                 <button 
                   onClick={() => setShowStockOnly(!showStockOnly)}
@@ -358,7 +359,6 @@ export default function App() {
                   在庫がある商品のみ表示
                 </button>
 
-                {/* ★ひとマス空けて配置 (ml-4) & プルダウン */}
                 <div className="ml-4 flex-1 min-w-[140px]">
                   <select
                     value={sortMode}
@@ -403,7 +403,6 @@ export default function App() {
                         <div className="text-[10px] text-gray-500 mt-1 flex flex-wrap gap-2 items-center">
                           <span className="bg-gray-100 px-1 rounded">{item.教科}</span>
                           <span className="bg-gray-100 px-1 rounded">{item.学年}</span>
-                          {/* 備考がある場合は表示 */}
                           {item.備考 && (
                              <span className="text-gray-400 truncate max-w-[150px]">memo: {item.備考}</span>
                           )}
@@ -530,7 +529,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* ★備考欄を追加 */}
                 <div>
                   <label className="text-xs font-bold text-gray-500 ml-1">備考</label>
                   <textarea 
@@ -561,7 +559,6 @@ export default function App() {
           )}
         </div>
 
-        {/* 固定フッター */}
         {view === 'list' && (
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_15px_rgba(0,0,0,0.1)] p-3 pb-6 z-40">
             <div className="max-w-[600px] mx-auto">
