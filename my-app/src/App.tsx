@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2, Pencil, CheckSquare, Square } from 'lucide-react';
 
 // ▼▼▼ あなたの最新URLです (変更なし) ▼▼▼
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec";
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwunczXt8moZUE52_5g4O0NvnCmM-GJTDs2_iQVNPeB9OERKF01G6VfS_lODKUe6V_z-w/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 const GRADE_ORDER = [
