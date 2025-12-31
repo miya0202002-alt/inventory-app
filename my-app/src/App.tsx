@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Plus, Package, Archive, ChevronUp, ChevronDown, Trash2, Pencil, CheckSquare, Square } from 'lucide-react';
 
-// ▼▼▼ あなたの最新URLです ▼▼▼
+// ▼▼▼ あなたの最新URLです (変更なし) ▼▼▼
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxnney8Ahjm4L_hg2QuLHCzI7ZodTOP0sfsSRw5AiLT_rsOjnlN5OP2UqSWND864xtahg/exec";
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
@@ -20,6 +20,7 @@ interface Item {
   発注点: number;
   教材原価: number;
   在庫金額: number;
+  備考: string; // ★追加
   originalIndex: number;
 }
 
@@ -32,7 +33,11 @@ interface NewItemState {
   stock: number | '';
   alert: number | '';
   cost: number | '';
+  memo: string; // ★追加
 }
+
+// ソートのパターンを定義
+type SortMode = 'grade' | 'stockDesc' | 'stockAsc' | 'subject' | 'name' | 'id';
 
 export default function App() {
   const [items, setItems] = useState<Item[]>([]);
@@ -41,7 +46,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   
   const [showStockOnly, setShowStockOnly] = useState(true);
-  const [sortMode, setSortMode] = useState<'id' | 'stock' | 'name' | 'subject' | 'grade'>('grade');
+  const [sortMode, setSortMode] = useState<SortMode>('grade'); // 初期値は学年順
   
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [qty, setQty] = useState<number | ''>(1);
@@ -54,7 +59,8 @@ export default function App() {
     gradeManual: '',  
     stock: 1, 
     alert: 1, 
-    cost: ''
+    cost: '',
+    memo: '' // ★追加
   });
 
   const fetchItems = async () => {
@@ -70,6 +76,7 @@ export default function App() {
         発注点: Number(item.発注点),
         教材原価: Number(item.教材原価),
         在庫金額: Number(item.在庫金額),
+        備考: item.備考 || '', // ★追加（なければ空文字）
         originalIndex: index
       }));
       
@@ -89,7 +96,7 @@ export default function App() {
     setView('list');
     setSearchQuery('');
     setSelectedItem(null);
-    setSortMode('grade');
+    // ソートモードはリセットせず維持する方が使いやすいのでそのまま
     setQty(1);
   };
 
@@ -107,7 +114,8 @@ export default function App() {
         gradeManual: isStandardGrade ? '' : selectedItem.学年,
         stock: selectedItem.現在在庫数, 
         alert: selectedItem.発注点,
-        cost: selectedItem.教材原価
+        cost: selectedItem.教材原価,
+        memo: selectedItem.備考 // ★追加
     });
     
     setView('edit');
@@ -206,7 +214,8 @@ export default function App() {
           grade: finalGrade, 
           stock: newItem.stock === '' ? 0 : newItem.stock,
           alert: newItem.alert === '' ? 0 : newItem.alert,
-          cost: newItem.cost
+          cost: newItem.cost,
+          memo: newItem.memo // ★追加：備考を送信
         })
       });
 
@@ -216,10 +225,10 @@ export default function App() {
         setNewItem({ 
           name: '', subject: '数学', subjectManual: '', 
           grade: '中1', gradeManual: '', 
-          stock: 1, alert: 1, cost: '' 
+          stock: 1, alert: 1, cost: '', memo: '' 
         });
         setView('list');
-        setSortMode('grade'); 
+        // 保存後は学年順に戻すか、そのままにするか。ここではそのままにします。
         fetchItems();
       } else {
         alert(`エラー: ${result.message}`);
@@ -233,18 +242,26 @@ export default function App() {
 
   const filteredItems = items
     .filter(item => {
-      const matchesSearch = searchQuery === '' || 
-        String(item.教材名).toLowerCase().includes(searchQuery.toLowerCase()) ||
-        String(item.教科).toLowerCase().includes(searchQuery.toLowerCase());
+      // ★検索対象に「備考」も追加
+      const searchTarget = (
+        String(item.教材名) + 
+        String(item.教科) + 
+        String(item.備考)
+      ).toLowerCase();
+      
+      const matchesSearch = searchQuery === '' || searchTarget.includes(searchQuery.toLowerCase());
       const matchesStock = showStockOnly ? item.現在在庫数 > 0 : true;
       return matchesSearch && matchesStock;
     })
     .sort((a, b) => {
-      if (sortMode === 'stock') return a.現在在庫数 - b.現在在庫数;
-      if (sortMode === 'name') return a.教材名.localeCompare(b.教材名, 'ja');
-      if (sortMode === 'subject') return a.教科.localeCompare(b.教科, 'ja');
-      if (sortMode === 'grade') return a.originalIndex - b.originalIndex;
-      return b.商品ID - a.商品ID;
+      // ★ソートロジックの変更
+      if (sortMode === 'grade') return a.originalIndex - b.originalIndex; // 学年順（シートの並び）
+      if (sortMode === 'stockDesc') return b.現在在庫数 - a.現在在庫数; // 在庫多い順
+      if (sortMode === 'stockAsc') return a.現在在庫数 - b.現在在庫数; // 在庫少ない順
+      if (sortMode === 'subject') return a.教科.localeCompare(b.教科, 'ja'); // 教科順
+      if (sortMode === 'name') return a.教材名.localeCompare(b.教材名, 'ja'); // 名前順
+      if (sortMode === 'id') return b.商品ID - a.商品ID; // 追加順（新しいID順）
+      return 0;
     });
 
   return (
@@ -254,15 +271,13 @@ export default function App() {
         {/* ヘッダー */}
         <div className="sticky top-0 bg-white z-10 border-b border-gray-200 px-4 pt-4 pb-2">
           
-          {/* タイトルとリンクボタン */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
             <h1 onClick={resetApp} className="text-2xl font-black text-gray-900 cursor-pointer active:opacity-70 transition-opacity select-none whitespace-nowrap">
               教科書在庫管理
             </h1>
             
-            {/* ★画像リンクエリア (高さ統一・比率保持) */}
+            {/* 画像リンクエリア */}
             <div className="flex gap-3 items-center">
-              {/* 中央教育研究所 */}
               <a 
                 href="https://www.chuoh-kyouiku.co.jp/index.php" 
                 target="_blank" 
@@ -272,7 +287,6 @@ export default function App() {
                 <img src="/chuoh.png" alt="中央教育研究所" className="h-full w-auto object-contain" />
               </a>
 
-              {/* 育伸社 */}
               <a 
                 href="https://www.ikushin.co.jp/" 
                 target="_blank" 
@@ -296,7 +310,7 @@ export default function App() {
                   setNewItem({ 
                     name: '', subject: '数学', subjectManual: '', 
                     grade: '中1', gradeManual: '', 
-                    stock: 1, alert: 1, cost: '' 
+                    stock: 1, alert: 1, cost: '', memo: '' 
                   });
                   setView('add');
               }}
@@ -323,7 +337,7 @@ export default function App() {
                   <Search className="absolute left-2 top-2.5 text-gray-400" size={16} />
                   <input 
                     type="text" 
-                    placeholder="検索..." 
+                    placeholder="検索 (名前・教科・備考)..." 
                     className="w-full pl-9 pr-2 py-2 bg-gray-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -334,21 +348,30 @@ export default function App() {
                 </button>
               </div>
 
-              {/* ソート & フィルター */}
-              <div className="flex flex-wrap gap-2 mb-3 px-2 items-center">
+              {/* ソート & フィルター (プルダウンに変更) */}
+              <div className="flex flex-wrap items-center mb-3 px-2">
                 <button 
                   onClick={() => setShowStockOnly(!showStockOnly)}
-                  className="flex items-center gap-1 text-xs font-bold text-gray-700 mr-2 active:opacity-70"
+                  className="flex items-center gap-1 text-xs font-bold text-gray-700 active:opacity-70"
                 >
-                 {showStockOnly ? <CheckSquare size={16} /> : <Square size={16} />}
+                  {showStockOnly ? <CheckSquare size={16} /> : <Square size={16} />}
                   在庫がある商品のみ表示
                 </button>
 
-                <div className="flex gap-2 overflow-x-auto pb-1 flex-1">
-                    <SortButton label="学年順" active={sortMode === 'grade'} onClick={() => setSortMode('grade')} />
-                    <SortButton label="教科順" active={sortMode === 'subject'} onClick={() => setSortMode('subject')} />
-                    <SortButton label="追加順" active={sortMode === 'id'} onClick={() => setSortMode('id')} />
-                    <SortButton label="在庫少ない順" active={sortMode === 'stock'} onClick={() => setSortMode('stock')} />
+                {/* ★ひとマス空けて配置 (ml-4) & プルダウン */}
+                <div className="ml-4 flex-1 min-w-[140px]">
+                  <select
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value as SortMode)}
+                    className="w-full p-2 bg-gray-100 border-none rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="grade">学年順</option>
+                    <option value="stockDesc">在庫の多い順</option>
+                    <option value="stockAsc">在庫の少ない順</option>
+                    <option value="subject">教科順</option>
+                    <option value="name">名前順</option>
+                    <option value="id">追加順</option>
+                  </select>
                 </div>
               </div>
 
@@ -377,9 +400,13 @@ export default function App() {
                           {item.教材名}
                           <span className="text-[11px] font-normal text-gray-500 ml-2">¥{item.教材原価.toLocaleString()}</span>
                         </div>
-                        <div className="text-[10px] text-gray-500 mt-1 flex gap-2">
+                        <div className="text-[10px] text-gray-500 mt-1 flex flex-wrap gap-2 items-center">
                           <span className="bg-gray-100 px-1 rounded">{item.教科}</span>
                           <span className="bg-gray-100 px-1 rounded">{item.学年}</span>
+                          {/* 備考がある場合は表示 */}
+                          {item.備考 && (
+                             <span className="text-gray-400 truncate max-w-[150px]">memo: {item.備考}</span>
+                          )}
                         </div>
                       </div>
                       <div className="w-[25%] text-center flex flex-col items-center justify-center">
@@ -452,7 +479,7 @@ export default function App() {
                     <input 
                       type="text" 
                       className="w-full border p-3 rounded-lg mt-2 bg-gray-50"
-                      placeholder="学年を入力"
+                      placeholder="学名を入力"
                       value={newItem.gradeManual}
                       onChange={e => setNewItem({...newItem, gradeManual: e.target.value})}
                     />
@@ -501,6 +528,18 @@ export default function App() {
                         isError={newItem.alert === ''}
                     />
                   </div>
+                </div>
+
+                {/* ★備考欄を追加 */}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 ml-1">備考</label>
+                  <textarea 
+                    className="w-full border p-3 rounded-lg mt-1 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="検索キーワードやメモを入力 (例: 〇〇先生使用)"
+                    rows={3}
+                    value={newItem.memo}
+                    onChange={e => setNewItem({...newItem, memo: e.target.value})}
+                  />
                 </div>
                 
                 {view === 'edit' && (
@@ -576,7 +615,7 @@ export default function App() {
                 <ActionButton 
                   label="出庫" 
                   icon={<Archive size={16} />} 
-                  colorClass="text-orange-600 border-orange-400 hover:bg-orange-50" 
+                  colorClass="text-blue-600 border-blue-600 hover:bg-blue-50" 
                   disabled={!selectedItem || qty === ''} 
                   onClick={() => handleStockUpdate('出庫')} 
                 />
@@ -585,7 +624,7 @@ export default function App() {
                     <ActionButton 
                         label="編集" 
                         icon={<Pencil size={14} />} 
-                        colorClass="text-blue-600 border-blue-600 hover:bg-blue-50" 
+                        colorClass="text-orange-600 border-orange-400 hover:bg-orange-50" 
                         disabled={!selectedItem} 
                         onClick={handleEditClick} 
                     />
@@ -607,15 +646,6 @@ export default function App() {
     </div>
   );
 }
-
-const SortButton = ({ label, active, onClick }: any) => (
-  <button 
-    onClick={onClick} 
-    className={`px-3 py-1 rounded-full border text-xs font-bold whitespace-nowrap transition-colors ${active ? 'bg-black text-white border-black' : 'bg-white text-gray-500 border-gray-200'}`}
-  >
-    {label}
-  </button>
-);
 
 const InputGroup = ({ label, value, onChange, type = "text", placeholder, required, showAsterisk, isError }: any) => (
   <div className="flex-1 relative">
